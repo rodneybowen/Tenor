@@ -482,9 +482,11 @@ button {
   bottom: max(24px, env(safe-area-inset-bottom, 24px));
   left: 50%;
   transform: translateX(-50%);
-  /* Translucent enough that the backdrop blur actually reads as
-     frosted glass; the white veil + heavy blur keep text legible. */
-  background: rgba(255, 255, 255, 0.62);
+  /* Frosted where the browser composites backdrop-filter. The 0.85
+     base also keeps the nav clean and legible when blur is dropped
+     (e.g. macOS "Reduce transparency", GPU accel off) — no sharp
+     content bleed-through in that fallback. */
+  background: rgba(255, 255, 255, 0.85);
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
   border: 1.5px solid rgba(255, 255, 255, 0.9);
@@ -495,6 +497,13 @@ button {
   padding: 8px 12px;
   gap: 4px;
   z-index: 20;
+}
+/* When the OS/browser asks for reduced transparency, backdrop-filter
+   is suppressed — go fully solid so the nav stays crisp and legible. */
+@media (prefers-reduced-transparency: reduce) {
+  .pill-nav {
+    background: rgba(255, 255, 255, 0.97);
+  }
 }
 .nav-btn {
   width: 76px;
