@@ -1,0 +1,561 @@
+/* ════════════════════════════════════════════════════════════
+   Tenor — design tokens + global + home screen styles
+   Spacing follows a strict 4px grid. Rounded corners everywhere.
+   ~90% neutrals; emotion colors are functional only.
+   ════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Neutrals */
+  --n-50: #fafafa;
+  --n-100: #f5f5f5;
+  --n-200: #e6e6e6;
+  --n-300: #d6d6d6;
+  --n-400: #a5a5a5;
+  --n-500: #767676;
+  --n-600: #575757;
+  --n-700: #434343;
+  --n-800: #222222;
+  --n-900: #1a1a1a;
+  --charcoal: #222222;
+
+  /* Surfaces — frosted glass */
+  --surface: rgba(255, 255, 255, 0.68);
+  --surface-hi: rgba(255, 255, 255, 0.75);
+  --surface-lo: rgba(255, 255, 255, 0.5);
+  --border: rgba(255, 255, 255, 0.82);
+  --shadow-soft: 0 6px 28px rgba(34, 34, 34, 0.1), 0 2px 8px rgba(34, 34, 34, 0.06);
+  --shadow-card: 0 4px 22px rgba(34, 34, 34, 0.07);
+
+  /* Background blobs — lightest emotion shades only (texture, not color) */
+  --blob-blue: #dde7ff;
+  --blob-green: #d7ffe2;
+  --blob-yellow: #fff5c6;
+  --blob-coral: #ffdfdf;
+
+  --r-pill: 50px;
+  --r-card: 24px;
+
+  --font-serif: 'Merriweather', Georgia, serif;
+  --font-sans: 'Montserrat', system-ui, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #d9d6d2;
+  color: var(--charcoal);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font-family: var(--font-sans);
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+/* ── App shell: centered mobile viewport ── */
+.app-root {
+  position: relative;
+  width: 100%;
+  max-width: 430px;
+  height: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  background: #f4f2f0;
+}
+
+/* ── Background blobs (aurora) ── */
+.blobs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.85;
+  animation: drift linear infinite;
+}
+.blob-a {
+  width: 300px;
+  height: 300px;
+  background: var(--blob-yellow);
+  top: -64px;
+  left: -56px;
+  animation-duration: 24s;
+}
+.blob-b {
+  width: 264px;
+  height: 264px;
+  background: var(--blob-coral);
+  top: 168px;
+  right: -48px;
+  animation-duration: 28s;
+  animation-delay: -8s;
+}
+.blob-c {
+  width: 280px;
+  height: 280px;
+  background: var(--blob-green);
+  bottom: 188px;
+  left: -40px;
+  animation-duration: 26s;
+  animation-delay: -14s;
+}
+.blob-d {
+  width: 248px;
+  height: 248px;
+  background: var(--blob-blue);
+  bottom: -40px;
+  right: -32px;
+  animation-duration: 22s;
+  animation-delay: -5s;
+}
+@keyframes drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  25% {
+    transform: translate(20px, -16px) scale(1.05);
+  }
+  50% {
+    transform: translate(10px, 24px) scale(0.97);
+  }
+  75% {
+    transform: translate(-16px, 8px) scale(1.03);
+  }
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob {
+    animation: none;
+  }
+}
+
+/* ── Grain overlay ── */
+.grain {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* ── Screen ── */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 5;
+  animation: screen-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ── Wordmark ── */
+.wordmark {
+  font-family: var(--font-serif);
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.45em;
+  color: var(--charcoal);
+  opacity: 0.32;
+  text-transform: uppercase;
+  text-align: center;
+  padding-top: 20px;
+  padding-left: 0.45em;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+/* ── Home scroll column ── */
+.home-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 168px;
+}
+.home-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Hero: greeting + FAB ── */
+.hero {
+  min-height: 56vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 48px;
+  flex-shrink: 0;
+  padding: 24px 0;
+}
+.greeting {
+  font-family: var(--font-serif);
+  font-size: clamp(28px, 8vw, 36px);
+  font-weight: 300;
+  color: var(--charcoal);
+  text-align: center;
+  line-height: 1.42;
+}
+.greeting em {
+  font-style: italic;
+}
+
+.fab-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.fab {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--surface-hi);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--charcoal);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.22s;
+}
+.fab:active {
+  transform: scale(0.93);
+}
+.fab:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 4px;
+}
+.fab-hint {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--charcoal);
+  opacity: 0.62;
+  letter-spacing: 0.03em;
+}
+
+/* ── This week's mood card ── */
+.week-card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  padding: 24px 20px;
+  flex-shrink: 0;
+}
+.week-card__title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--charcoal);
+  margin-bottom: 20px;
+}
+
+/* Day dots row */
+.day-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 24px;
+}
+.day {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-radius: 20px;
+  transition: background 0.2s;
+}
+.day--today {
+  background: rgba(34, 34, 34, 0.06);
+}
+.day--selected {
+  background: rgba(34, 34, 34, 0.1);
+}
+.day__letter {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--charcoal);
+  opacity: 0.45;
+}
+.day--selected .day__letter,
+.day--today .day__letter {
+  opacity: 0.85;
+}
+.day__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid transparent;
+}
+.day__dot--logged {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+    0 1px 3px rgba(34, 34, 34, 0.12);
+}
+.day__dot--empty {
+  background: rgba(34, 34, 34, 0.05);
+  border-color: rgba(34, 34, 34, 0.12);
+}
+.day__dot--future {
+  background: transparent;
+  border: 1.5px dashed rgba(34, 34, 34, 0.18);
+}
+
+/* Selected-day label */
+.day-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--charcoal);
+  opacity: 0.7;
+  margin-bottom: 14px;
+  letter-spacing: 0.02em;
+}
+
+/* Log entries list for the selected day */
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 296px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.log-list::-webkit-scrollbar {
+  display: none;
+}
+
+.log-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  box-shadow: 0 2px 10px rgba(34, 34, 34, 0.05);
+}
+.log-card__body {
+  flex: 1;
+  min-width: 0;
+}
+.log-card__keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.keyword {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--charcoal);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  padding: 4px 12px;
+  border-radius: var(--r-pill);
+}
+.log-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--charcoal);
+  opacity: 0.55;
+  letter-spacing: 0.02em;
+}
+.log-card__icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--charcoal);
+  flex-shrink: 0;
+}
+
+/* Empty-day message */
+.log-empty__msg {
+  font-size: 14px;
+  color: var(--charcoal);
+  opacity: 0.45;
+  text-align: center;
+  padding: 28px 0;
+}
+
+/* Footer actions — "view all logs" always shows; "log your mood"
+   shows only when today is the selected day. */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.card-actions button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 13px 18px;
+  border-radius: var(--r-pill);
+  transition: opacity 0.18s, background 0.18s;
+}
+.card-actions button:active {
+  opacity: 0.78;
+}
+.card-actions button:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 3px;
+}
+.btn-primary {
+  background: var(--charcoal);
+  color: #fff;
+}
+.btn-secondary {
+  background: var(--surface-lo);
+  color: var(--charcoal);
+  border: 1.5px solid var(--border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* ── Floating pill nav ── */
+.pill-nav {
+  position: absolute;
+  bottom: max(24px, env(safe-area-inset-bottom, 24px));
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(28px);
+  -webkit-backdrop-filter: blur(28px);
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--r-pill);
+  box-shadow: 0 8px 32px rgba(34, 34, 34, 0.1), 0 2px 8px rgba(34, 34, 34, 0.06);
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 4px;
+  z-index: 20;
+}
+.nav-btn {
+  width: 76px;
+  height: 48px;
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--charcoal);
+  transition: background 0.2s;
+}
+.nav-btn--active {
+  background: rgba(34, 34, 34, 0.09);
+}
+.nav-btn span {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0.5;
+}
+.nav-btn--active span {
+  opacity: 1;
+}
+.nav-btn:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+
+/* ── Placeholder (log flow not built yet) ── */
+.placeholder {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 32px;
+  text-align: center;
+  background: rgba(244, 242, 240, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: screen-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.placeholder h2 {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 300;
+  color: var(--charcoal);
+}
+.placeholder p {
+  font-size: 14px;
+  color: var(--charcoal);
+  opacity: 0.55;
+  max-width: 260px;
+  line-height: 1.6;
+}
+.placeholder button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--charcoal);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.03em;
+  padding: 14px 26px;
+  border-radius: var(--r-pill);
+}
