@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, CalendarBlank } from '@phosphor-icons/react';
 import WeekMoodCard from '../components/WeekMoodCard';
-import { MOCK_LOGS, TODAY, TODAY_KEY } from '../data/mockLogs';
+import { TODAY, TODAY_KEY, type LogEntry } from '../data/mockLogs';
 
 const USER_NAME = 'Rohan';
 
@@ -12,13 +12,12 @@ function greetingFor(hour: number): string {
 }
 
 interface Props {
+  logs: LogEntry[];
   onLog: () => void;
   onViewLogs: () => void;
 }
 
-export default function HomeScreen({ onLog, onViewLogs }: Props) {
-  // In-memory only — no persistence (matches prototype scope).
-  const [logs] = useState(MOCK_LOGS);
+export default function HomeScreen({ logs, onLog, onViewLogs }: Props) {
   const [selectedKey, setSelectedKey] = useState(TODAY_KEY);
 
   return (

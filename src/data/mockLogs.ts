@@ -41,6 +41,15 @@ function dateKey(d: Date): string {
 
 export const TODAY_KEY = dateKey(TODAY);
 
+/** 'h:MM AM/PM' for a freshly-submitted log. */
+export function formatClock(d: Date): string {
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, '0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m} ${ampm}`;
+}
+
 /** Sunday-anchored week containing TODAY. */
 export function getWeek(): WeekDay[] {
   const start = new Date(TODAY);
