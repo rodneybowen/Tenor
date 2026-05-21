@@ -1175,6 +1175,10 @@ button {
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  /* Proximity snap — gentle. The browser nudges scroll so the
+     nearest chip lands at the viewport center after the user stops,
+     but doesn't fight fast/intentional pans. */
+  scroll-snap-type: both proximity;
   /* Soft fade at top and bottom — chips appear and disappear
      gradually instead of being clipped by an abrupt straight edge. */
   mask-image: linear-gradient(
@@ -1202,6 +1206,8 @@ button {
   height: 116px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
+  /* Snap target — viewport center settles on the chip's center. */
+  scroll-snap-align: center;
   /* Constant 4px border so swapping color (transparent → ring)
      doesn't reflow the chip's inner content area. */
   border: 4px solid transparent;

@@ -113,6 +113,14 @@ const FISHEYE_RADIUS = 240;
 const SCALE_FLOOR = 0.7;
 const OPACITY_FLOOR = 0.55;
 
+/** Web Vibration API — real haptic on Android browsers, a no-op
+ *  on iOS Safari (Apple doesn't ship it) and desktop browsers. */
+function haptic(ms: number) {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    navigator.vibrate(ms);
+  }
+}
+
 export default function EmotionGridScreen({
   entryQuadrant,
   selected,
@@ -167,9 +175,28 @@ export default function EmotionGridScreen({
         applyFisheye();
       });
     }
+    // When scroll settles, see if it landed on a chip (CSS snap
+    // pulls it there). If yes, a tiny haptic confirms the snap.
+    function onScrollEnd() {
+      const v = viewportRef.current;
+      if (!v) return;
+      const vcx = v.scrollLeft + v.clientWidth / 2;
+      const vcy = v.scrollTop + v.clientHeight / 2;
+      let nearest = Infinity;
+      for (const p of positions) {
+        const d = Math.hypot(p.cx - vcx, p.cy - vcy);
+        if (d < nearest) nearest = d;
+      }
+      // 14px is comfortably tighter than half a cell — only fires
+      // when the snap genuinely landed on a chip, not on free pans
+      // into the empty scroll-padding zones.
+      if (nearest < 14) haptic(8);
+    }
     vp.addEventListener('scroll', onScroll, { passive: true });
+    vp.addEventListener('scrollend', onScrollEnd);
     return () => {
       vp.removeEventListener('scroll', onScroll);
+      vp.removeEventListener('scrollend', onScrollEnd);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -232,7 +259,10 @@ export default function EmotionGridScreen({
                 }}
                 aria-pressed={isSelected}
                 disabled={disabled}
-                onClick={() => onToggle({ name: p.name, quadrant: p.quadrant })}
+                onClick={() => {
+                  haptic(isSelected ? 6 : 12);
+                  onToggle({ name: p.name, quadrant: p.quadrant });
+                }}
               >
                 {p.name}
               </button>
