@@ -190,7 +190,9 @@ button {
   opacity: 0.32;
   text-transform: uppercase;
   text-align: center;
-  padding-top: 20px;
+  /* Push the wordmark below the iOS notch / status bar when
+     installed as a PWA (black-translucent status bar style). */
+  padding-top: calc(20px + env(safe-area-inset-top, 0px));
   padding-left: 0.45em;
   flex-shrink: 0;
   position: relative;
@@ -574,7 +576,9 @@ button {
 .top-bar {
   display: flex;
   align-items: center;
-  padding: 16px 20px 0;
+  /* Top padding tracks safe-area-inset-top so the back button
+     clears the iOS notch when installed as a PWA. */
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 20px 0;
   position: relative;
   z-index: 10;
   flex-shrink: 0;
@@ -1136,7 +1140,9 @@ button {
 }
 .eg-header {
   position: absolute;
-  top: 56px;
+  /* Track safe-area-inset-top so the back button + counter clear
+     the iOS notch in PWA mode. */
+  top: calc(56px + env(safe-area-inset-top, 0px));
   left: 0;
   right: 0;
   z-index: 5;
@@ -1165,7 +1171,9 @@ button {
 .eg-spacer { width: 44px; height: 44px; }
 .eg-viewport {
   position: absolute;
-  top: 116px;
+  /* Track safe-area-inset-top so the viewport starts below the
+     header which itself sits below the notch. */
+  top: calc(116px + env(safe-area-inset-top, 0px));
   left: 0;
   right: 0;
   /* Bottom leaves room for the definition card + next button. */
