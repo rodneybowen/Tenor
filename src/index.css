@@ -1182,19 +1182,20 @@ button {
 }
 .eg-chip {
   position: absolute;
-  width: 64px;
-  height: 64px;
+  width: 116px;
+  height: 116px;
   border-radius: 50%;
   transform: translate(-50%, -50%);
-  border: 1.5px solid transparent;
-  padding: 4px;
+  border: 2px solid transparent;
+  padding: 8px;
   box-sizing: border-box;
-  font-size: 10px;
-  line-height: 1.15;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.2;
   font-weight: 500;
   text-align: center;
   overflow-wrap: break-word;
-  word-break: break-word;
+  word-break: normal;
   hyphens: auto;
   display: flex;
   align-items: center;
@@ -1206,7 +1207,7 @@ button {
 }
 .eg-chip--on {
   font-weight: 600;
-  border-width: 2px;
+  border-width: 3px;
   box-shadow: 0 4px 14px rgba(34, 34, 34, 0.2);
 }
 .eg-chip--disabled {

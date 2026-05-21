@@ -18,17 +18,30 @@ interface Props {
 }
 
 // — Geometry ————————————————————————————————————————————————
-// The pannable plane is square. Four quadrants occupy the four
-// corners; chips inside each quadrant sit on a 3×4 grid tilted
-// toward the plane's outer corner so the strongest emotion lands
-// in the corner and the mildest near the plane center. Kept tight
-// so several quadrants' chips are visible at once.
-const PLANE = 600;
-const HALF = PLANE / 2;
-const QUAD_INNER = 20; // gap from plane center where chips start
-const QUAD_OUTER = 290; // distance from plane center where chips end
+// Chip-cell layout. Each quadrant fills its corner of the plane
+// with a COLS×ROWS grid of fixed-size circular buttons sitting on
+// a cell pitch of CHIP + GAP. The plane is taller than the viewport
+// so vertical panning reveals each quadrant's high/low rows.
+//   col 0 = closest to plane center seam (mildest of that row)
+//   col COLS-1 = closest to outer corner (strongest of that row)
+// Same for rows. Intensity radiates from plane center → outer corner.
+const CHIP = 116;
+const GAP = 4;
+const CELL = CHIP + GAP;
 const COLS = 3;
 const ROWS = 4;
+// Distance from plane center to the first chip's center, chosen so
+// chips facing each other across the seam also have a 4px edge gap.
+const QUAD_INNER = CHIP / 2 + GAP / 2;
+const EDGE_MARGIN = 2;
+// Plane half-extents derived from layout; plane is rectangular —
+// taller than wide because ROWS > COLS.
+const HALF_W =
+  QUAD_INNER + (COLS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
+const HALF_H =
+  QUAD_INNER + (ROWS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
+const PLANE_W = HALF_W * 2;
+const PLANE_H = HALF_H * 2;
 
 // Which corner of the plane each quadrant occupies — matches sketch:
 //   HEP top-left,  HEN top-right
@@ -47,43 +60,38 @@ interface ChipPos {
   cy: number;
 }
 
-/** Centroid of a quadrant — used to scroll-center on entry. */
+/** Geometric center of a quadrant's chip grid — used to scroll-center on entry. */
 function quadrantCenter(q: Quadrant): { x: number; y: number } {
   const d = QUAD_DIR[q];
-  const mid = (QUAD_INNER + QUAD_OUTER) / 2;
-  return { x: HALF + d.sx * mid, y: HALF + d.sy * mid };
+  const midX = QUAD_INNER + ((COLS - 1) * CELL) / 2;
+  const midY = QUAD_INNER + ((ROWS - 1) * CELL) / 2;
+  return { x: HALF_W + d.sx * midX, y: HALF_H + d.sy * midY };
 }
 
 function buildPositions(): ChipPos[] {
   const out: ChipPos[] = [];
-  const range = QUAD_OUTER - QUAD_INNER;
   for (const q of Object.keys(QUAD_DIR) as Quadrant[]) {
     const d = QUAD_DIR[q];
-    // Build the 12 cell centers in cartesian order, then sort by
-    // distance from the plane's outer corner: closest cell takes
-    // the strongest emotion (rank 11), farthest takes the mildest (0).
-    const corner = { x: HALF + d.sx * QUAD_OUTER, y: HALF + d.sy * QUAD_OUTER };
-    const cells: { x: number; y: number }[] = [];
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const fx = (c + 0.5) / COLS;
-        const fy = (r + 0.5) / ROWS;
-        const x = HALF + d.sx * (QUAD_INNER + fx * range);
-        const y = HALF + d.sy * (QUAD_INNER + fy * range);
-        cells.push({ x, y });
+    // Build cell centers in (col, row) order. Then sort by distance
+    // from the OUTER corner cell so cells[0] is the corner-most
+    // (strongest) and cells[last] is the center-most (mildest).
+    const cells: { x: number; y: number; rank: number }[] = [];
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const x = HALF_W + d.sx * (QUAD_INNER + col * CELL);
+        const y = HALF_H + d.sy * (QUAD_INNER + row * CELL);
+        const dCol = COLS - 1 - col;
+        const dRow = ROWS - 1 - row;
+        cells.push({ x, y, rank: Math.hypot(dCol, dRow) });
       }
     }
-    cells.sort(
-      (a, b) =>
-        Math.hypot(a.x - corner.x, a.y - corner.y) -
-        Math.hypot(b.x - corner.x, b.y - corner.y),
-    );
+    cells.sort((a, b) => a.rank - b.rank);
     const list = INTENSITY_ORDER[q];
-    // rank index 11 (strongest) → cells[0] (closest to corner)
     list.forEach((name, intensity) => {
+      // intensity 0 = mildest → cells[last]; max = strongest → cells[0]
       const cellIdx = list.length - 1 - intensity;
-      const { x, y } = cells[cellIdx];
-      out.push({ quadrant: q, name, cx: x, cy: y });
+      const c = cells[cellIdx];
+      out.push({ quadrant: q, name, cx: c.x, cy: c.y });
     });
   }
   return out;
@@ -188,7 +196,7 @@ export default function EmotionGridScreen({
       <div className="eg-viewport" ref={viewportRef} aria-label="Emotion grid">
         <div
           className="eg-plane"
-          style={{ width: PLANE, height: PLANE }}
+          style={{ width: PLANE_W, height: PLANE_H }}
           role="group"
         >
           {positions.map((p) => {
