@@ -174,7 +174,7 @@ export default function EmotionGridScreen({
     // Selected: vibrant full-strength fill + thick darker-quadrant
     // ring — three differentiation signals (saturation, ring, weight).
     return {
-      background: isSelected ? quadrantColor(q, 1) : quadrantColor(q, 0.22),
+      background: isSelected ? quadrantColor(q, 1) : quadrantColor(q, 0.4),
       borderColor: isSelected ? shadeQuadrant(q, 0.35) : 'transparent',
       color: 'var(--charcoal)',
     };
