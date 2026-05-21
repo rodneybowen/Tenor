@@ -112,7 +112,6 @@ export default function LogMethodScreen({
                   className={`quad-btn quad-btn--${q}`}
                   onClick={() => onPickQuadrant(q)}
                 >
-                  <span className="quad-btn__short">{meta.short}</span>
                   <span className="quad-btn__label">{meta.label}</span>
                 </button>
               );

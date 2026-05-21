@@ -19,13 +19,14 @@ interface Props {
 
 // — Geometry ————————————————————————————————————————————————
 // The pannable plane is square. Four quadrants occupy the four
-// corners; chips inside each quadrant are arranged on a 3×4 grid
-// tilted toward the plane's outer corner so the strongest emotion
-// sits in the corner and the mildest near the plane center.
-const PLANE = 800;
+// corners; chips inside each quadrant sit on a 3×4 grid tilted
+// toward the plane's outer corner so the strongest emotion lands
+// in the corner and the mildest near the plane center. Kept tight
+// so several quadrants' chips are visible at once.
+const PLANE = 600;
 const HALF = PLANE / 2;
-const QUAD_INNER = 80; // gap from plane center where chips start
-const QUAD_OUTER = 380; // distance from plane center where chips end
+const QUAD_INNER = 20; // gap from plane center where chips start
+const QUAD_OUTER = 290; // distance from plane center where chips end
 const COLS = 3;
 const ROWS = 4;
 
@@ -158,12 +159,13 @@ export default function EmotionGridScreen({
   }, [entryQuadrant]);
 
   function chipStyle(q: Quadrant, isSelected: boolean): CSSProperties {
-    // Unselected: faint quadrant tint + visible quadrant-colored border so
-    // users can see which quadrant a chip belongs to without panning into it.
-    // Selected: solid quadrant fill with white text.
+    // Clean white circles with a strong quadrant-colored ring so the
+    // border alone communicates which quadrant a chip belongs to.
+    // Selected: solid quadrant fill with white text — high contrast
+    // against neighbors.
     return {
-      background: isSelected ? quadrantColor(q, 0.92) : quadrantColor(q, 0.1),
-      borderColor: quadrantColor(q, isSelected ? 1 : 0.8),
+      background: isSelected ? quadrantColor(q, 0.95) : 'rgba(255,255,255,0.95)',
+      borderColor: quadrantColor(q, isSelected ? 1 : 0.85),
       color: isSelected ? '#fff' : 'var(--charcoal)',
     };
   }
@@ -222,7 +224,7 @@ export default function EmotionGridScreen({
       </div>
 
       <footer className="eg-footer">
-        <p className="eg-hint">drag to explore the other quadrants</p>
+        <p className="eg-hint">drag to explore more emotions</p>
         <button
           type="button"
           className="btn-primary eg-next"
