@@ -100,9 +100,9 @@ export default function LogMethodScreen({
           </button>
 
           <h2 className="lm-quad-title">Need help naming your feelings?</h2>
-          <p className="lm-quad-sub">Pick a quadrant to start exploring.</p>
+          <p className="lm-quad-sub">Pick a category to start exploring.</p>
 
-          <div className="quad-grid" role="group" aria-label="Emotion quadrants">
+          <div className="quad-grid" role="group" aria-label="Emotion categories">
             {QUADRANT_GRID.map((q) => {
               const meta = QUADRANTS[q];
               return (
