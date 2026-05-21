@@ -35,14 +35,21 @@ const ROWS = 4;
 // chips facing each other across the seam also have a 4px edge gap.
 const QUAD_INNER = CHIP / 2 + GAP / 2;
 const EDGE_MARGIN = 2;
-// Plane half-extents derived from layout; plane is rectangular —
-// taller than wide because ROWS > COLS.
-const HALF_W =
+// Half-extent of the chip cluster (center → outermost chip edge).
+const INNER_HALF_W =
   QUAD_INNER + (COLS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
-const HALF_H =
+const INNER_HALF_H =
   QUAD_INNER + (ROWS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
-const PLANE_W = HALF_W * 2;
-const PLANE_H = HALF_H * 2;
+// Extra padding on every side of the plane so the user can scroll
+// past the chip cluster — even the outermost chip can be brought to
+// the viewport center (and enlarged by the fisheye). Generous so it
+// works across a range of viewport heights/widths.
+const SCROLL_PAD_X = 300;
+const SCROLL_PAD_Y = 400;
+const PLANE_W = (INNER_HALF_W + SCROLL_PAD_X) * 2;
+const PLANE_H = (INNER_HALF_H + SCROLL_PAD_Y) * 2;
+const CENTER_X = PLANE_W / 2;
+const CENTER_Y = PLANE_H / 2;
 
 // Which corner of the plane each quadrant occupies — matches sketch:
 //   HEP top-left,  HEN top-right
@@ -66,7 +73,7 @@ function quadrantCenter(q: Quadrant): { x: number; y: number } {
   const d = QUAD_DIR[q];
   const midX = QUAD_INNER + ((COLS - 1) * CELL) / 2;
   const midY = QUAD_INNER + ((ROWS - 1) * CELL) / 2;
-  return { x: HALF_W + d.sx * midX, y: HALF_H + d.sy * midY };
+  return { x: CENTER_X + d.sx * midX, y: CENTER_Y + d.sy * midY };
 }
 
 function buildPositions(): ChipPos[] {
@@ -79,8 +86,8 @@ function buildPositions(): ChipPos[] {
     const cells: { x: number; y: number; rank: number }[] = [];
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
-        const x = HALF_W + d.sx * (QUAD_INNER + col * CELL);
-        const y = HALF_H + d.sy * (QUAD_INNER + row * CELL);
+        const x = CENTER_X + d.sx * (QUAD_INNER + col * CELL);
+        const y = CENTER_Y + d.sy * (QUAD_INNER + row * CELL);
         const dCol = COLS - 1 - col;
         const dRow = ROWS - 1 - row;
         cells.push({ x, y, rank: Math.hypot(dCol, dRow) });
