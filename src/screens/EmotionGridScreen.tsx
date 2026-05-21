@@ -18,6 +18,7 @@ import {
   type EmotionSelection,
   type Quadrant,
 } from '../theme/emotions';
+import { useVocabulary, type Emotion, type VocabByCategory } from '../lib/vocabulary';
 
 interface Props {
   entryQuadrant: Quadrant;
@@ -29,32 +30,25 @@ interface Props {
 }
 
 // — Geometry ————————————————————————————————————————————————
-// Chip-cell layout. Each quadrant fills its corner of the plane
-// with a COLS×ROWS grid of fixed-size circular buttons sitting on
-// a cell pitch of CHIP + GAP. The plane is taller than the viewport
-// so vertical panning reveals each quadrant's high/low rows.
-//   col 0 = closest to plane center seam (mildest of that row)
-//   col COLS-1 = closest to outer corner (strongest of that row)
-// Same for rows. Intensity radiates from plane center → outer corner.
+// Each quadrant fills its corner of the plane with up to COLS×ROWS
+// circular chips on a CHIP+GAP cell pitch. Chips are placed in
+// mild → strong order, sorted by distance from the INNER corner
+// (closest to plane center). Mildest sits at the seam; strongest
+// reaches toward the outer corner. Categories with fewer emotions
+// just leave the outer-corner cells empty.
 const CHIP = 116;
 const GAP = 4;
 const CELL = CHIP + GAP;
-const COLS = 3;
-const ROWS = 4;
-// Distance from plane center to the first chip's center, chosen so
-// chips facing each other across the seam also have a 4px edge gap.
+const COLS = 6;
+const ROWS = 9;
 const QUAD_INNER = CHIP / 2 + GAP / 2;
 const EDGE_MARGIN = 2;
-// Half-extent of the chip cluster (center → outermost chip edge).
 const INNER_HALF_W =
   QUAD_INNER + (COLS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
 const INNER_HALF_H =
   QUAD_INNER + (ROWS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
-// Extra padding on every side of the plane so the user can scroll
-// past the chip cluster — even the outermost chip can be brought to
-// the viewport center (and enlarged by the fisheye). Sized just
-// past half the typical mobile viewport so edge chips can center
-// without panning into excessive empty space.
+// Scroll-pad so even the outermost chip can be panned to viewport
+// center (and enlarged by the fisheye).
 const SCROLL_PAD_X = 220;
 const SCROLL_PAD_Y = 400;
 const PLANE_W = (INNER_HALF_W + SCROLL_PAD_X) * 2;
@@ -62,9 +56,7 @@ const PLANE_H = (INNER_HALF_H + SCROLL_PAD_Y) * 2;
 const CENTER_X = PLANE_W / 2;
 const CENTER_Y = PLANE_H / 2;
 
-// Which corner of the plane each quadrant occupies — matches sketch:
-//   HEP top-left,  HEN top-right
-//   LEP bot-left,  LEN bot-right
+// Sketch layout: HEP top-left, HEN top-right, LEP bot-left, LEN bot-right.
 const QUAD_DIR: Record<Quadrant, { sx: -1 | 1; sy: -1 | 1 }> = {
   hep: { sx: -1, sy: -1 },
   hen: { sx: 1, sy: -1 },
@@ -79,7 +71,7 @@ interface ChipPos {
   cy: number;
 }
 
-/** Geometric center of a quadrant's chip grid — used to scroll-center on entry. */
+/** Geometric center of a quadrant's chip grid — used for entry scroll-centering. */
 function quadrantCenter(q: Quadrant): { x: number; y: number } {
   const d = QUAD_DIR[q];
   const midX = QUAD_INNER + ((COLS - 1) * CELL) / 2;
@@ -87,39 +79,46 @@ function quadrantCenter(q: Quadrant): { x: number; y: number } {
   return { x: CENTER_X + d.sx * midX, y: CENTER_Y + d.sy * midY };
 }
 
-function buildPositions(): ChipPos[] {
+function buildPositions(vocab: VocabByCategory): ChipPos[] {
   const out: ChipPos[] = [];
   for (const q of Object.keys(QUAD_DIR) as Quadrant[]) {
     const d = QUAD_DIR[q];
-    // Build cell centers in (col, row) order. Then sort by distance
-    // from the OUTER corner cell so cells[0] is the corner-most
-    // (strongest) and cells[last] is the center-most (mildest).
+    // Cell centers sorted by distance from the INNER corner (col 0, row 0).
+    // cells[0] is closest to the plane-center seam (mildest goes here);
+    // cells[last] is the outer corner (strongest).
     const cells: { x: number; y: number; rank: number }[] = [];
     for (let row = 0; row < ROWS; row++) {
       for (let col = 0; col < COLS; col++) {
         const x = CENTER_X + d.sx * (QUAD_INNER + col * CELL);
         const y = CENTER_Y + d.sy * (QUAD_INNER + row * CELL);
-        const dCol = COLS - 1 - col;
-        const dRow = ROWS - 1 - row;
-        cells.push({ x, y, rank: Math.hypot(dCol, dRow) });
+        cells.push({ x, y, rank: Math.hypot(col, row) });
       }
     }
     cells.sort((a, b) => a.rank - b.rank);
-    const list = INTENSITY_ORDER[q];
-    list.forEach((name, intensity) => {
-      // intensity 0 = mildest → cells[last]; max = strongest → cells[0]
-      const cellIdx = list.length - 1 - intensity;
-      const c = cells[cellIdx];
-      out.push({ quadrant: q, name, cx: c.x, cy: c.y });
-    });
+    const list = vocab[q] ?? [];
+    for (let i = 0; i < list.length && i < cells.length; i++) {
+      const c = cells[i];
+      out.push({ quadrant: q, name: list[i].name, cx: c.x, cy: c.y });
+    }
   }
   return out;
 }
 
+// Static fallback used while the sheet CSV is in flight (or if the
+// network/CORS ever blocks the fetch). Keeps the app usable offline.
+function fallbackVocab(): VocabByCategory {
+  const fb: VocabByCategory = { hep: [], lep: [], hen: [], len: [] };
+  for (const q of Object.keys(INTENSITY_ORDER) as Quadrant[]) {
+    fb[q] = INTENSITY_ORDER[q].map((name): Emotion => ({
+      name,
+      tier: 'Moderate',
+      definition: EMOTION_DEFINITIONS[name] ?? '',
+    }));
+  }
+  return fb;
+}
+
 // — Fisheye tuning —————————————————————————————————————————
-// Lite fisheye: chips near the viewport center inflate slightly
-// past their natural size; chips farther away scale + fade. Never
-// to zero — edges stay legible so the layout reads at a glance.
 const FISHEYE_RADIUS = 240;
 const SCALE_CEIL = 1.08;
 const SCALE_FLOOR = 0.6;
@@ -145,21 +144,29 @@ export default function EmotionGridScreen({
   const chipRefs = useRef(new Map<string, HTMLButtonElement>());
   const rafRef = useRef<number | null>(null);
 
-  // Which chip is closest to the viewport center — drives the
-  // definition card. Tracked in a ref to avoid re-render on every
-  // scroll frame; only commits to state when it actually changes.
+  // Live vocabulary from the published Google Sheet (cached at
+  // module level). Until it arrives, show the static fallback so
+  // the screen never blanks.
+  const { vocab } = useVocabulary();
+  const byCategory: VocabByCategory = vocab?.byCategory ?? fallbackVocab();
+  const definitionByName: Record<string, string> = useMemo(() => {
+    if (vocab) return vocab.definitions;
+    return EMOTION_DEFINITIONS;
+  }, [vocab]);
+
+  const positions = useMemo(() => buildPositions(byCategory), [byCategory]);
+
   const initialCentered = useMemo<ChipPos>(() => {
-    const eq = buildPositions().find((p) => p.quadrant === entryQuadrant);
-    return eq ?? buildPositions()[0];
+    const eq = positions.find((p) => p.quadrant === entryQuadrant);
+    return eq ?? positions[0];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const centeredRef = useRef<string>(initialCentered.name);
   const [centered, setCentered] = useState<ChipPos>(initialCentered);
 
-  // Mouse-only pointer drag — gives explicit 2D pan (including
-  // diagonal) that the trackpad's axis-biased gesture won't.
-  // Touch is left to native overflow scrolling so mobile momentum
-  // + snap keeps feeling right.
+  // Mouse-only pointer drag — explicit 2D pan (including diagonal)
+  // that the trackpad's axis-biased gesture won't give. Touch stays
+  // on native overflow scrolling.
   const dragRef = useRef<{
     sx: number; sy: number; sLeft: number; sTop: number; moved: boolean;
   } | null>(null);
@@ -200,8 +207,6 @@ export default function EmotionGridScreen({
     const moved = dragRef.current?.moved ?? false;
     dragRef.current = null;
     if (moved) {
-      // Swallow the click that fires right after a drag-pan so a
-      // chip under the cursor doesn't get selected on release.
       suppressClickRef.current = true;
       requestAnimationFrame(() => {
         suppressClickRef.current = false;
@@ -217,7 +222,6 @@ export default function EmotionGridScreen({
     }
   }
 
-  const positions = useMemo(buildPositions, []);
   const selectedSet = useMemo(
     () => new Set(selected.map((s) => s.name)),
     [selected],
@@ -225,8 +229,8 @@ export default function EmotionGridScreen({
   const capReached = selected.length >= max;
 
   // Mutate chip transforms directly on scroll — avoids re-rendering
-  // 48 chips on every scroll tick. Also picks the nearest chip so
-  // the definition card below the grid reflects what's centered.
+  // every chip on every scroll tick. Also picks the chip closest to
+  // viewport center so the definition card knows what to show.
   function applyFisheye() {
     const vp = viewportRef.current;
     if (!vp) return;
@@ -254,13 +258,23 @@ export default function EmotionGridScreen({
     }
   }
 
+  // Entry centering: runs once when the screen mounts or the entry
+  // quadrant changes. Deliberately NOT re-run when positions change
+  // (e.g. live vocab loads) so the user's scroll position isn't
+  // yanked back to centroid mid-explore.
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
-    // Center the viewport on the entry quadrant's centroid.
     const c = quadrantCenter(entryQuadrant);
     vp.scrollLeft = c.x - vp.clientWidth / 2;
     vp.scrollTop = c.y - vp.clientHeight / 2;
+  }, [entryQuadrant]);
+
+  // Listeners + fisheye apply: also re-attaches when positions change
+  // (live vocab → new chip set) so the listener closure stays fresh.
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
     applyFisheye();
 
     function onScroll() {
@@ -270,8 +284,6 @@ export default function EmotionGridScreen({
         applyFisheye();
       });
     }
-    // When scroll settles, see if it landed on a chip (CSS snap
-    // pulls it there). If yes, a tiny haptic confirms the snap.
     function onScrollEnd() {
       const v = viewportRef.current;
       if (!v) return;
@@ -282,9 +294,6 @@ export default function EmotionGridScreen({
         const d = Math.hypot(p.cx - vcx, p.cy - vcy);
         if (d < nearest) nearest = d;
       }
-      // 14px is comfortably tighter than half a cell — only fires
-      // when the snap genuinely landed on a chip, not on free pans
-      // into the empty scroll-padding zones.
       if (nearest < 14) haptic(8);
     }
     vp.addEventListener('scroll', onScroll, { passive: true });
@@ -295,14 +304,13 @@ export default function EmotionGridScreen({
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryQuadrant]);
+  }, [positions]);
 
   function chipStyle(q: Quadrant, isSelected: boolean): CSSProperties {
-    // Unselected: filled with a light quadrant tint — charcoal text
-    // still reads with strong contrast (the pastel base + 0.22 alpha
-    // sits well above the WCAG AA threshold on white).
-    // Selected: vibrant full-strength fill + thick darker-quadrant
-    // ring — three differentiation signals (saturation, ring, weight).
+    // Unselected: light quadrant tint (charcoal text still passes
+    // WCAG AA on every quadrant). Selected: vibrant fill + thick
+    // darker-quadrant ring (selection signal #3 alongside saturation
+    // and bolder weight).
     return {
       background: isSelected ? quadrantColor(q, 1) : quadrantColor(q, 0.4),
       borderColor: isSelected ? shadeQuadrant(q, 0.35) : 'transparent',
@@ -383,7 +391,7 @@ export default function EmotionGridScreen({
           >
             &ldquo;{centered.name}&rdquo;
           </span>
-          <p className="eg-def__body">{EMOTION_DEFINITIONS[centered.name]}</p>
+          <p className="eg-def__body">{definitionByName[centered.name] ?? ''}</p>
         </div>
         <button
           type="button"
