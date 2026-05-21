@@ -61,11 +61,17 @@ body,
 
 body {
   font-family: var(--font-sans);
-  /* Unconditionally match the app interior. If any layout-math gap
-     exposes the body (iOS PWA safe-area quirks, scroll bounce), the
-     gap is now invisible. Desktop loses the prior gray "phone frame"
-     ring — minor cost for guaranteed correctness on device. */
-  background: #f4f2f0;
+  /* Last-resort backdrop: a static aurora-toned gradient painted
+     directly on <body>. If any layout-math gap exposes body (iOS
+     PWA home-indicator safe-area, scroll bounce), what shows
+     through visually continues the aurora colors instead of
+     contrasting flat block. */
+  background:
+    radial-gradient(120% 90% at 20% 0%, #FFFBEB 0%, transparent 55%),
+    radial-gradient(110% 80% at 100% 25%, #FFF1F1 0%, transparent 60%),
+    radial-gradient(120% 100% at 0% 100%, #EEFFF2 0%, transparent 55%),
+    radial-gradient(120% 90% at 100% 100%, #ECF2FF 0%, transparent 55%),
+    #f4f2f0;
   color: var(--charcoal);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
