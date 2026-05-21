@@ -68,6 +68,16 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* When installed as a PWA, body bg matches the app interior so any
+   safe-area math at the bottom doesn't show a contrasting strip
+   under the home indicator. Desktop browser still gets the neutral
+   gray "phone frame" look. */
+@media (display-mode: standalone) {
+  body {
+    background: #f4f2f0;
+  }
+}
+
 button {
   font-family: var(--font-sans);
   cursor: pointer;
@@ -164,6 +174,18 @@ button {
   inset: 0;
   z-index: 1;
   pointer-events: none;
+}
+
+/* In PWA standalone mode, promote the backdrop layers (aurora blobs
+   + grain) to position: fixed so they paint to every viewport edge —
+   including the safe-area zones the layout sometimes can't reach.
+   The .app-root flow is unaffected; this only changes what surface
+   the backdrop is anchored to. */
+@media (display-mode: standalone) {
+  .blobs,
+  .grain {
+    position: fixed;
+  }
 }
 
 /* ── Screen ── */
