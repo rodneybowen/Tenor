@@ -42,9 +42,10 @@ const INNER_HALF_H =
   QUAD_INNER + (ROWS - 1) * CELL + CHIP / 2 + EDGE_MARGIN;
 // Extra padding on every side of the plane so the user can scroll
 // past the chip cluster — even the outermost chip can be brought to
-// the viewport center (and enlarged by the fisheye). Generous so it
-// works across a range of viewport heights/widths.
-const SCROLL_PAD_X = 300;
+// the viewport center (and enlarged by the fisheye). Sized just
+// past half the typical mobile viewport so edge chips can center
+// without panning into excessive empty space.
+const SCROLL_PAD_X = 220;
 const SCROLL_PAD_Y = 400;
 const PLANE_W = (INNER_HALF_W + SCROLL_PAD_X) * 2;
 const PLANE_H = (INNER_HALF_H + SCROLL_PAD_Y) * 2;
