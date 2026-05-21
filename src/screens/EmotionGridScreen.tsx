@@ -117,11 +117,13 @@ function buildPositions(): ChipPos[] {
 }
 
 // — Fisheye tuning —————————————————————————————————————————
-// Lite fisheye: chips near the viewport center stay full size and
-// fully opaque; chips farther away scale and fade — never to zero.
+// Lite fisheye: chips near the viewport center inflate slightly
+// past their natural size; chips farther away scale + fade. Never
+// to zero — edges stay legible so the layout reads at a glance.
 const FISHEYE_RADIUS = 240;
-const SCALE_FLOOR = 0.7;
-const OPACITY_FLOOR = 0.55;
+const SCALE_CEIL = 1.08;
+const SCALE_FLOOR = 0.6;
+const OPACITY_FLOOR = 0.42;
 
 /** Web Vibration API — real haptic on Android browsers, a no-op
  *  on iOS Safari (Apple doesn't ship it) and desktop browsers. */
@@ -241,7 +243,7 @@ export default function EmotionGridScreen({
         nearest = pos;
       }
       const t = Math.min(1, dist / FISHEYE_RADIUS);
-      const scale = 1 - (1 - SCALE_FLOOR) * t;
+      const scale = SCALE_CEIL - (SCALE_CEIL - SCALE_FLOOR) * t;
       const opacity = 1 - (1 - OPACITY_FLOOR) * t;
       el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
       el.style.opacity = opacity.toFixed(3);
