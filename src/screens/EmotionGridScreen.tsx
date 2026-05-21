@@ -4,6 +4,7 @@ import BackButton from '../components/BackButton';
 import {
   INTENSITY_ORDER,
   quadrantColor,
+  shadeQuadrant,
   type EmotionSelection,
   type Quadrant,
 } from '../theme/emotions';
@@ -167,14 +168,15 @@ export default function EmotionGridScreen({
   }, [entryQuadrant]);
 
   function chipStyle(q: Quadrant, isSelected: boolean): CSSProperties {
-    // Clean white circles with a strong quadrant-colored ring so the
-    // border alone communicates which quadrant a chip belongs to.
-    // Selected: solid quadrant fill with white text — high contrast
-    // against neighbors.
+    // Unselected: filled with a light quadrant tint — charcoal text
+    // still reads with strong contrast (the pastel base + 0.22 alpha
+    // sits well above the WCAG AA threshold on white).
+    // Selected: vibrant full-strength fill + thick darker-quadrant
+    // ring — three differentiation signals (saturation, ring, weight).
     return {
-      background: isSelected ? quadrantColor(q, 0.95) : 'rgba(255,255,255,0.95)',
-      borderColor: quadrantColor(q, isSelected ? 1 : 0.85),
-      color: isSelected ? '#fff' : 'var(--charcoal)',
+      background: isSelected ? quadrantColor(q, 1) : quadrantColor(q, 0.22),
+      borderColor: isSelected ? shadeQuadrant(q, 0.35) : 'transparent',
+      color: 'var(--charcoal)',
     };
   }
 

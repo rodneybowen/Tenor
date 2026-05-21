@@ -62,6 +62,14 @@ function tint(q: Quadrant, amt: number, alpha = 1): string {
   return `rgba(${m(r)}, ${m(g)}, ${m(b)}, ${alpha})`;
 }
 
+/** Darken a quadrant color toward black by `amt` (0–1). Used for the
+ *  selected-state ring so it reads as a deeper variant of the fill. */
+export function shadeQuadrant(q: Quadrant, amt: number, alpha = 1): string {
+  const [r, g, b] = QUADRANTS[q].rgb;
+  const m = (c: number) => Math.max(0, Math.round(c * (1 - amt)));
+  return `rgba(${m(r)}, ${m(g)}, ${m(b)}, ${alpha})`;
+}
+
 /**
  * Fill for a day dot — always a soft gradient. A single emotion reads as a
  * gently lit sphere of that hue; multiple emotions melt smoothly into one
