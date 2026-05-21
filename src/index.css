@@ -61,21 +61,15 @@ body,
 
 body {
   font-family: var(--font-sans);
-  background: #d9d6d2;
+  /* Unconditionally match the app interior. If any layout-math gap
+     exposes the body (iOS PWA safe-area quirks, scroll bounce), the
+     gap is now invisible. Desktop loses the prior gray "phone frame"
+     ring — minor cost for guaranteed correctness on device. */
+  background: #f4f2f0;
   color: var(--charcoal);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-}
-
-/* When installed as a PWA, body bg matches the app interior so any
-   safe-area math at the bottom doesn't show a contrasting strip
-   under the home indicator. Desktop browser still gets the neutral
-   gray "phone frame" look. */
-@media (display-mode: standalone) {
-  body {
-    background: #f4f2f0;
-  }
 }
 
 button {
@@ -185,6 +179,15 @@ button {
   .blobs,
   .grain {
     position: fixed;
+  }
+  /* iOS PWA can leave a strip below `.app-root` when `height: 100dvh`
+     doesn't include the home-indicator safe-area. Pin the shell to
+     the viewport directly so it always reaches all four edges. */
+  .app-root {
+    position: fixed;
+    inset: 0;
+    max-width: none;
+    margin: 0;
   }
 }
 
