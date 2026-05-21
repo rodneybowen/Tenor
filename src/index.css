@@ -1128,7 +1128,12 @@ button {
 /* ════════════════════════════════════════════
    Emotion grid — pannable plane with lite fisheye
    ════════════════════════════════════════════ */
-#emotion-grid { padding-top: 0; }
+#emotion-grid {
+  padding-top: 0;
+  /* Plain white background — hides the aurora blobs/grain so chip
+     colors read on a calm, neutral ground. */
+  background: #ffffff;
+}
 .eg-header {
   position: absolute;
   top: 56px;
@@ -1170,9 +1175,6 @@ button {
   touch-action: pan-x pan-y;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  /* Soft white wash so the aurora blobs behind don't bleed into
-     the chip colors — chips read on a calmer ground. */
-  background: rgba(255, 255, 255, 0.5);
 }
 .eg-viewport::-webkit-scrollbar { display: none; }
 .eg-plane {
@@ -1222,9 +1224,9 @@ button {
   padding: 18px 24px 24px;
   background: linear-gradient(
     to bottom,
-    rgba(244, 242, 240, 0) 0%,
-    rgba(244, 242, 240, 0.92) 45%,
-    var(--surface) 100%
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.95) 45%,
+    #ffffff 100%
   );
   pointer-events: none;
 }
