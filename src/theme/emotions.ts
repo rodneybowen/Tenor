@@ -114,8 +114,10 @@ function uniqueQuadrants(quadrants: Quadrant[]): Quadrant[] {
   return [...new Set(quadrants)];
 }
 
-/** Mix a quadrant color toward white by `amt` (0–1). */
-function tint(q: Quadrant, amt: number, alpha = 1): string {
+/** Mix a quadrant color toward white by `amt` (0–1). Use for solid
+ *  pastel fills where you want the visual of a low-alpha overlay
+ *  but need real opacity (e.g. UI sitting over a border line). */
+export function tintQuadrant(q: Quadrant, amt: number, alpha = 1): string {
   const [r, g, b] = QUADRANTS[q].rgb;
   const m = (c: number) => Math.round(c + (255 - c) * amt);
   return `rgba(${m(r)}, ${m(g)}, ${m(b)}, ${alpha})`;
@@ -138,7 +140,7 @@ export function dotBackground(quadrants: Quadrant[]): string {
   const qs = uniqueQuadrants(quadrants);
   if (qs.length === 0) return 'transparent';
   if (qs.length === 1) {
-    return `linear-gradient(150deg, ${tint(qs[0], 0.34)} 0%, ${quadrantColor(
+    return `linear-gradient(150deg, ${tintQuadrant(qs[0], 0.34)} 0%, ${quadrantColor(
       qs[0],
       0.95,
     )} 100%)`;

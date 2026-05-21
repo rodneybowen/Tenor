@@ -14,6 +14,7 @@ import {
   INTENSITY_ORDER,
   quadrantColor,
   shadeQuadrant,
+  tintQuadrant,
   type EmotionSelection,
   type Quadrant,
 } from '../theme/emotions';
@@ -376,9 +377,9 @@ export default function EmotionGridScreen({
         <div className="eg-def" aria-live="polite">
           <span
             className="eg-def__word"
-            style={{ background: quadrantColor(centered.quadrant, 0.4) }}
+            style={{ background: tintQuadrant(centered.quadrant, 0.6, 1) }}
           >
-            {centered.name}
+            &ldquo;{centered.name}&rdquo;
           </span>
           <p className="eg-def__body">{EMOTION_DEFINITIONS[centered.name]}</p>
         </div>
