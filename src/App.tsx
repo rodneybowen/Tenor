@@ -6,20 +6,25 @@ import PillNav, { type NavTab } from './components/PillNav';
 import HomeScreen from './screens/HomeScreen';
 import LogMethodScreen from './screens/LogMethodScreen';
 import VoiceScreen from './screens/VoiceScreen';
+import EmotionGridScreen from './screens/EmotionGridScreen';
+import EmotionReviewScreen from './screens/EmotionReviewScreen';
 import ConfirmationScreen from './screens/ConfirmationScreen';
 import { MOCK_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
 import type { Detected } from './lib/emotionDetect';
-import type { Quadrant } from './theme/emotions';
+import type { EmotionSelection, Quadrant } from './theme/emotions';
 
 type Screen =
   | 'home'
   | 'logMethod'
   | 'voice'
+  | 'emotionGrid'
+  | 'emotionReview'
   | 'confirmation'
   | 'logs'
   | 'chat'
-  | 'account'
-  | 'emotion';
+  | 'account';
+
+type ConfirmMode = 'speak' | 'select';
 
 const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
   logs: {
@@ -34,10 +39,6 @@ const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
     title: 'Account',
     body: 'The account tab is out of scope for this prototype.',
   },
-  emotion: {
-    title: 'Emotion selector',
-    body: 'The quadrant + emotion-grid flow is the next distinct flow after Speak.',
-  },
 };
 
 const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
@@ -45,8 +46,16 @@ const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
+
+  // Speak flow + emotion flow both end up on the same Confirmation screen.
   const [confirmChips, setConfirmChips] = useState<Detected[]>([]);
   const [confirmTime, setConfirmTime] = useState('');
+  const [confirmMode, setConfirmMode] = useState<ConfirmMode>('speak');
+
+  // Emotion-selector flow state
+  const [entryQuadrant, setEntryQuadrant] = useState<Quadrant>('hep');
+  const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
+  const [emotionContext, setEmotionContext] = useState('');
 
   function submitVoiceLog(chips: Detected[]) {
     const now = new Date();
@@ -66,6 +75,52 @@ export default function App() {
     setLogs((prev) => [...prev, entry]);
     setConfirmChips(chips);
     setConfirmTime(time);
+    setConfirmMode('speak');
+    setScreen('confirmation');
+  }
+
+  function pickQuadrant(q: Quadrant) {
+    setEntryQuadrant(q);
+    setEmotionSelected([]);
+    setEmotionContext('');
+    setScreen('emotionGrid');
+  }
+
+  function toggleEmotion(sel: EmotionSelection) {
+    setEmotionSelected((prev) => {
+      const idx = prev.findIndex((s) => s.name === sel.name);
+      if (idx >= 0) return prev.filter((_, i) => i !== idx);
+      if (prev.length >= 5) return prev;
+      return [...prev, sel];
+    });
+  }
+
+  function removeEmotion(name: string) {
+    setEmotionSelected((prev) => prev.filter((s) => s.name !== name));
+  }
+
+  function submitEmotionLog() {
+    if (emotionSelected.length === 0) return;
+    const now = new Date();
+    const time = formatClock(now);
+    const quadrants = Array.from(new Set(emotionSelected.map((s) => s.quadrant)));
+    const entry: LogEntry = {
+      id: `e${Date.now()}`,
+      dateKey: TODAY_KEY,
+      time,
+      ts: Date.now(),
+      mode: 'select',
+      keywords: emotionSelected.map((s) => s.name),
+      quadrants,
+    };
+    setLogs((prev) => [...prev, entry]);
+    // Reuse the Confirmation screen's chip shape so it can render the
+    // same colored pills the Speak flow does.
+    setConfirmChips(
+      emotionSelected.map((s) => ({ text: s.name, quadrant: s.quadrant })),
+    );
+    setConfirmTime(time);
+    setConfirmMode('select');
     setScreen('confirmation');
   }
 
@@ -100,7 +155,7 @@ export default function App() {
         <LogMethodScreen
           onBack={() => setScreen('home')}
           onSpeak={() => setScreen('voice')}
-          onPickEmotions={() => setScreen('emotion')}
+          onPickQuadrant={pickQuadrant}
         />
       )}
 
@@ -112,10 +167,32 @@ export default function App() {
         />
       )}
 
+      {screen === 'emotionGrid' && (
+        <EmotionGridScreen
+          entryQuadrant={entryQuadrant}
+          selected={emotionSelected}
+          onToggle={toggleEmotion}
+          onBack={() => setScreen('logMethod')}
+          onNext={() => setScreen('emotionReview')}
+        />
+      )}
+
+      {screen === 'emotionReview' && (
+        <EmotionReviewScreen
+          selected={emotionSelected}
+          context={emotionContext}
+          onContextChange={setEmotionContext}
+          onRemove={removeEmotion}
+          onBack={() => setScreen('emotionGrid')}
+          onSubmit={submitEmotionLog}
+        />
+      )}
+
       {screen === 'confirmation' && (
         <ConfirmationScreen
           chips={confirmChips}
           time={confirmTime}
+          mode={confirmMode}
           onAddAnother={() => setScreen('logMethod')}
           onViewLogs={() => setScreen('home')}
         />

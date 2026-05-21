@@ -6,6 +6,12 @@ export type Quadrant = 'hep' | 'lep' | 'hen' | 'len';
 
 export type LogMode = 'speak' | 'type' | 'scan' | 'select';
 
+/** A single picked emotion in the emotion-selector flow. */
+export interface EmotionSelection {
+  name: string;
+  quadrant: Quadrant;
+}
+
 interface QuadrantMeta {
   label: string;
   short: string;
@@ -25,6 +31,18 @@ export const EMOTIONS: Record<Quadrant, string[]> = {
   lep: ['Calm', 'Content', 'Peaceful', 'Relaxed', 'Satisfied', 'Serene', 'Thankful', 'At ease', 'Tender', 'Accepted', 'Comfortable', 'Grounded'],
   hen: ['Anxious', 'Angry', 'Stressed', 'Overwhelmed', 'Frustrated', 'Irritated', 'Panicked', 'Nervous', 'Furious', 'Tense', 'Agitated', 'Disgusted'],
   len: ['Sad', 'Tired', 'Lonely', 'Hopeless', 'Empty', 'Melancholy', 'Disconnected', 'Numb', 'Bored', 'Exhausted', 'Disappointed', 'Defeated'],
+};
+
+/**
+ * Mild → strong ordering used by the emotion grid: chips with a higher
+ * intensity rank sit farther from the center of the grid (closer to the
+ * outer corner of their quadrant). Index 0 = mildest, length-1 = strongest.
+ */
+export const INTENSITY_ORDER: Record<Quadrant, string[]> = {
+  hep: ['Cheerful', 'Optimistic', 'Amused', 'Hopeful', 'Happy', 'Grateful', 'Enthusiastic', 'Proud', 'Excited', 'Inspired', 'Elated', 'Joyful'],
+  lep: ['At ease', 'Comfortable', 'Grounded', 'Calm', 'Tender', 'Relaxed', 'Content', 'Satisfied', 'Thankful', 'Accepted', 'Peaceful', 'Serene'],
+  hen: ['Tense', 'Irritated', 'Nervous', 'Agitated', 'Anxious', 'Frustrated', 'Stressed', 'Overwhelmed', 'Disgusted', 'Panicked', 'Angry', 'Furious'],
+  len: ['Bored', 'Tired', 'Disappointed', 'Disconnected', 'Sad', 'Melancholy', 'Lonely', 'Numb', 'Exhausted', 'Empty', 'Defeated', 'Hopeless'],
 };
 
 export function quadrantColor(q: Quadrant, alpha = 1): string {
