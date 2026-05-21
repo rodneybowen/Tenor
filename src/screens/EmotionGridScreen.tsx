@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+  type MouseEvent as ReactMouseEvent,
+} from 'react';
 import { CaretRight } from '@phosphor-icons/react';
 import BackButton from '../components/BackButton';
 import {
@@ -133,6 +141,67 @@ export default function EmotionGridScreen({
   const chipRefs = useRef(new Map<string, HTMLButtonElement>());
   const rafRef = useRef<number | null>(null);
 
+  // Mouse-only pointer drag — gives explicit 2D pan (including
+  // diagonal) that the trackpad's axis-biased gesture won't.
+  // Touch is left to native overflow scrolling so mobile momentum
+  // + snap keeps feeling right.
+  const dragRef = useRef<{
+    sx: number; sy: number; sLeft: number; sTop: number; moved: boolean;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+  const [dragging, setDragging] = useState(false);
+
+  function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    const vp = viewportRef.current;
+    if (!vp) return;
+    dragRef.current = {
+      sx: e.clientX,
+      sy: e.clientY,
+      sLeft: vp.scrollLeft,
+      sTop: vp.scrollTop,
+      moved: false,
+    };
+    vp.setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    const drag = dragRef.current;
+    const vp = viewportRef.current;
+    if (!drag || !vp) return;
+    const dx = e.clientX - drag.sx;
+    const dy = e.clientY - drag.sy;
+    if (!drag.moved && Math.hypot(dx, dy) > 4) {
+      drag.moved = true;
+      setDragging(true);
+    }
+    if (drag.moved) {
+      vp.scrollLeft = drag.sLeft - dx;
+      vp.scrollTop = drag.sTop - dy;
+    }
+  }
+
+  function onPointerUp() {
+    const moved = dragRef.current?.moved ?? false;
+    dragRef.current = null;
+    if (moved) {
+      // Swallow the click that fires right after a drag-pan so a
+      // chip under the cursor doesn't get selected on release.
+      suppressClickRef.current = true;
+      requestAnimationFrame(() => {
+        suppressClickRef.current = false;
+      });
+    }
+    setDragging(false);
+  }
+
+  function onClickCapture(e: ReactMouseEvent<HTMLDivElement>) {
+    if (suppressClickRef.current) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }
+
   const positions = useMemo(buildPositions, []);
   const selectedSet = useMemo(
     () => new Set(selected.map((s) => s.name)),
@@ -230,7 +299,16 @@ export default function EmotionGridScreen({
         <span className="eg-spacer" aria-hidden="true" />
       </header>
 
-      <div className="eg-viewport" ref={viewportRef} aria-label="Emotion grid">
+      <div
+        className={'eg-viewport' + (dragging ? ' eg-viewport--dragging' : '')}
+        ref={viewportRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onClickCapture={onClickCapture}
+        aria-label="Emotion grid"
+      >
         <div
           className="eg-plane"
           style={{ width: PLANE_W, height: PLANE_H }}

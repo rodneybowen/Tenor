@@ -1179,6 +1179,7 @@ button {
      nearest chip lands at the viewport center after the user stops,
      but doesn't fight fast/intentional pans. */
   scroll-snap-type: both proximity;
+  cursor: grab;
   /* Soft fade at top and bottom — chips appear and disappear
      gradually instead of being clipped by an abrupt straight edge. */
   mask-image: linear-gradient(
@@ -1195,6 +1196,9 @@ button {
     #000 calc(100% - 64px),
     transparent 100%
   );
+}
+.eg-viewport--dragging {
+  cursor: grabbing;
 }
 .eg-viewport::-webkit-scrollbar { display: none; }
 .eg-plane {
