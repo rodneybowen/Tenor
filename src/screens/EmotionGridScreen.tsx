@@ -10,6 +10,7 @@ import {
 import { CaretRight } from '@phosphor-icons/react';
 import BackButton from '../components/BackButton';
 import {
+  EMOTION_DEFINITIONS,
   INTENSITY_ORDER,
   quadrantColor,
   shadeQuadrant,
@@ -141,6 +142,17 @@ export default function EmotionGridScreen({
   const chipRefs = useRef(new Map<string, HTMLButtonElement>());
   const rafRef = useRef<number | null>(null);
 
+  // Which chip is closest to the viewport center — drives the
+  // definition card. Tracked in a ref to avoid re-render on every
+  // scroll frame; only commits to state when it actually changes.
+  const initialCentered = useMemo<ChipPos>(() => {
+    const eq = buildPositions().find((p) => p.quadrant === entryQuadrant);
+    return eq ?? buildPositions()[0];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const centeredRef = useRef<string>(initialCentered.name);
+  const [centered, setCentered] = useState<ChipPos>(initialCentered);
+
   // Mouse-only pointer drag — gives explicit 2D pan (including
   // diagonal) that the trackpad's axis-biased gesture won't.
   // Touch is left to native overflow scrolling so mobile momentum
@@ -210,22 +222,33 @@ export default function EmotionGridScreen({
   const capReached = selected.length >= max;
 
   // Mutate chip transforms directly on scroll — avoids re-rendering
-  // 48 chips on every scroll tick.
+  // 48 chips on every scroll tick. Also picks the nearest chip so
+  // the definition card below the grid reflects what's centered.
   function applyFisheye() {
     const vp = viewportRef.current;
     if (!vp) return;
     const vcx = vp.scrollLeft + vp.clientWidth / 2;
     const vcy = vp.scrollTop + vp.clientHeight / 2;
+    let nearest: ChipPos | null = null;
+    let nearestDist = Infinity;
     chipRefs.current.forEach((el, key) => {
       const pos = positions.find((p) => p.name === key);
       if (!pos) return;
       const dist = Math.hypot(pos.cx - vcx, pos.cy - vcy);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearest = pos;
+      }
       const t = Math.min(1, dist / FISHEYE_RADIUS);
       const scale = 1 - (1 - SCALE_FLOOR) * t;
       const opacity = 1 - (1 - OPACITY_FLOOR) * t;
       el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
       el.style.opacity = opacity.toFixed(3);
     });
+    if (nearest && (nearest as ChipPos).name !== centeredRef.current) {
+      centeredRef.current = (nearest as ChipPos).name;
+      setCentered(nearest);
+    }
   }
 
   useEffect(() => {
@@ -350,7 +373,15 @@ export default function EmotionGridScreen({
       </div>
 
       <footer className="eg-footer">
-        <p className="eg-hint">drag to explore more emotions</p>
+        <div className="eg-def" aria-live="polite">
+          <span
+            className="eg-def__word"
+            style={{ background: quadrantColor(centered.quadrant, 0.4) }}
+          >
+            {centered.name}
+          </span>
+          <p className="eg-def__body">{EMOTION_DEFINITIONS[centered.name]}</p>
+        </div>
         <button
           type="button"
           className="btn-primary eg-next"

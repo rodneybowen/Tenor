@@ -1168,7 +1168,8 @@ button {
   top: 116px;
   left: 0;
   right: 0;
-  bottom: 92px;
+  /* Bottom leaves room for the definition card + next button. */
+  bottom: 180px;
   overflow: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -1256,12 +1257,42 @@ button {
   pointer-events: none;
 }
 .eg-footer > * { pointer-events: auto; }
-.eg-hint {
-  font-size: 11px;
+/* Definition card — sits above the next button. Shows the
+   word + meaning of whichever chip is currently centered. */
+.eg-def {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(34, 34, 34, 0.06);
+  border-radius: 24px;
+  padding: 20px 22px 14px;
+  text-align: center;
+  box-shadow: 0 2px 10px rgba(34, 34, 34, 0.04);
+  margin-bottom: 6px;
+}
+.eg-def__word {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 5px 14px;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
   color: var(--charcoal);
-  opacity: 0.45;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.01em;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  /* background set inline based on the centered chip's quadrant. */
+}
+.eg-def__body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--charcoal);
+  line-height: 1.45;
   margin: 0;
+  opacity: 0.82;
 }
 .eg-next {
   width: 100%;

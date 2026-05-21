@@ -45,6 +45,65 @@ export const INTENSITY_ORDER: Record<Quadrant, string[]> = {
   len: ['Bored', 'Tired', 'Disappointed', 'Disconnected', 'Sad', 'Melancholy', 'Lonely', 'Numb', 'Exhausted', 'Empty', 'Defeated', 'Hopeless'],
 };
 
+/**
+ * Short, plain-language definitions surfaced under the centered chip in
+ * the emotion grid. Kept ~1 sentence so the card stays compact.
+ */
+export const EMOTION_DEFINITIONS: Record<string, string> = {
+  // HEP — high energy positive
+  Cheerful: 'A light, bright mood — quietly upbeat and warm.',
+  Optimistic: 'Expecting good things to come.',
+  Amused: 'Quietly entertained or tickled by something.',
+  Hopeful: 'Believing things will work out, even amid uncertainty.',
+  Happy: 'A simple, settled sense of well-being.',
+  Grateful: 'Appreciative of what — or who — you have.',
+  Enthusiastic: 'Energized and eager to engage.',
+  Proud: 'Pleased with yourself or something you achieved.',
+  Excited: 'Buzzing with anticipation.',
+  Inspired: 'Sparked into wanting to create or act.',
+  Elated: 'Lifted and high-spirited, almost soaring.',
+  Joyful: 'A bright, exuberant fullness of heart.',
+  // LEP — low energy positive
+  'At ease': 'Comfortable in the moment, no tension to manage.',
+  Comfortable: 'Settled and unbothered.',
+  Grounded: 'Centered and present in your body.',
+  Calm: 'Quietly composed, free of agitation.',
+  Tender: 'Softly warm, sometimes a little fragile.',
+  Relaxed: 'Released from stress; body unwound.',
+  Content: 'Satisfied with what is, not wanting more.',
+  Satisfied: 'A sense that things are enough.',
+  Thankful: 'Warmly aware of a gift received.',
+  Accepted: 'Feeling like you belong as you are.',
+  Peaceful: 'Inner quiet; the mind not pulling at anything.',
+  Serene: 'A deep, untroubled stillness.',
+  // HEN — high energy negative
+  Tense: 'Mind or body holding tight.',
+  Irritated: 'Mildly bothered; the edge of patience worn.',
+  Nervous: 'Apprehensive about something coming.',
+  Agitated: 'Stirred up; hard to sit still.',
+  Anxious: "Persistent worry the body can't shake.",
+  Frustrated: 'Blocked from what you want — energy with no outlet.',
+  Stressed: 'Carrying more than feels manageable.',
+  Overwhelmed: 'Too much input or pressure at once.',
+  Disgusted: 'Strong aversion or revulsion.',
+  Panicked: 'A sudden, sharp surge of alarm.',
+  Angry: 'A heated, energized response to harm or wrong.',
+  Furious: 'Anger at its fullest intensity.',
+  // LEN — low energy negative
+  Bored: 'Disengaged; nothing pulls your interest.',
+  Tired: 'The body asking for rest.',
+  Disappointed: "An expectation that didn't land.",
+  Disconnected: 'Distant from people, place, or yourself.',
+  Sad: 'A heavy, quiet ache.',
+  Melancholy: 'A soft, reflective sadness — sometimes wistful.',
+  Lonely: 'Aware of an absence of close company.',
+  Numb: 'Emotions muted or out of reach.',
+  Exhausted: 'Past tired — depleted in body and spirit.',
+  Empty: 'Hollow, like something important is missing.',
+  Defeated: 'Worn down to giving up.',
+  Hopeless: 'Unable to see a way forward.',
+};
+
 export function quadrantColor(q: Quadrant, alpha = 1): string {
   const [r, g, b] = QUADRANTS[q].rgb;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
