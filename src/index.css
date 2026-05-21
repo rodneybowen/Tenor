@@ -50,7 +50,13 @@ html,
 body,
 #root {
   width: 100%;
-  height: 100%;
+  /* iOS PWA quirk: with viewport-fit=cover, `height: 100%` can
+     exclude the home-indicator safe-area at the bottom, leaving a
+     strip of body-color visible. `100dvh` is the dynamic viewport
+     height — covers the full visible area including the safe zones.
+     `100vh` is the fallback for browsers that don't know dvh yet. */
+  height: 100vh;
+  height: 100dvh;
 }
 
 body {
