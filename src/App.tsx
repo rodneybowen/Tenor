@@ -232,14 +232,16 @@ export default function App() {
         </div>
       )}
 
-      {/* Fixed-position fade overlays — sit above content (z:15) but
-          below the pill nav (z:20). Top: solid white through the iOS
-          safe-area then fades out, so content visibly fades behind
-          the notch. Bottom: transparent at the top, solid white at
-          the bottom, so content fades into the area under the nav. */}
+      {/* Top fade — always present so the iOS notch always blends.
+          z:15 sits above content but below the pill nav (z:20). */}
       <div className="app-fade app-fade--top" aria-hidden="true" />
-      <div className="app-fade app-fade--bottom" aria-hidden="true" />
 
+      {/* Bottom fade — only when the pill nav is on screen.
+          Sized to end about halfway up the pill (gives the home-
+          indicator + lower half of the pill a clean white plate). */}
+      {showNav && (
+        <div className="app-fade app-fade--bottom" aria-hidden="true" />
+      )}
       {showNav && <PillNav active={navTab} onSelect={handleNav} />}
     </div>
   );
