@@ -304,35 +304,59 @@ function DayMoodLine({ logs }: { logs: LogEntry[] }) {
     };
   });
 
-  // Each leg = a quadratic Bézier with a perpendicular bulge so the
-  // line is always visibly curved — even a 2-point day arcs gracefully
-  // instead of cutting across as a straight diagonal. Sign alternates
-  // per segment so multi-point days read as a gentle organic wave.
-  const segments = points
-    .slice(0, -1)
-    .map((p, i) => {
-      const next = points[i + 1];
-      const dx = next.x - p.x;
-      const dy = next.y - p.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist < 0.1) return null;
-      // 90° CW perpendicular to the segment direction.
-      const perpX = dy / dist;
-      const perpY = -dx / dist;
-      const sign = i % 2 === 0 ? 1 : -1;
-      // 22% of the segment length, capped so long legs don't bow too far.
-      const bulge = Math.min(dist * 0.22, 45) * sign;
+  // Two-point days get a single quadratic Bézier whose control point
+  // sits on the chord-perpendicular such that:
+  //   - descending chord → curve bows ABOVE (cap): looks like a soft landing
+  //   - ascending chord → curve bows BELOW (cup): the line ends pointing
+  //     steeply upward — reads as "slowly but surely uplifting"
+  // Three-or-more-point days use a Catmull-Rom cubic spline so the line
+  // is C1-continuous through every interior point (no "glued segments").
+  type Segment = { d: string; from: Quadrant; to: Quadrant };
+  const segments: Segment[] = [];
+
+  if (points.length === 2) {
+    const p = points[0];
+    const next = points[1];
+    const dx = next.x - p.x;
+    const dy = next.y - p.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist >= 0.1) {
+      // Perpendicular choice flips on trend so the curve always sits on
+      // the "outside" of the trend direction (cap for down, cup for up).
+      // SVG y grows downward → dy>0 is descending in mood.
+      const useDown = dy > 0;
+      const perpX = useDown ? dy / dist : -dy / dist;
+      const perpY = useDown ? -dx / dist : dx / dist;
+      const bulge = Math.min(dist * 0.24, 50);
       const midX = (p.x + next.x) / 2;
       const midY = (p.y + next.y) / 2;
       const cx = midX + perpX * bulge;
       const cy = midY + perpY * bulge;
-      return {
+      segments.push({
         d: `M ${p.x} ${p.y} Q ${cx} ${cy} ${next.x} ${next.y}`,
         from: p.quadrant,
         to: next.quadrant,
-      };
-    })
-    .filter((s): s is { d: string; from: Quadrant; to: Quadrant } => s !== null);
+      });
+    }
+  } else if (points.length >= 3) {
+    for (let i = 0; i < points.length - 1; i++) {
+      const p = points[i];
+      const next = points[i + 1];
+      const prev = points[i - 1] ?? p;
+      const after = points[i + 2] ?? next;
+      // Catmull-Rom → cubic Bézier control points share tangents at joins,
+      // giving smooth (C1-continuous) transitions through every point.
+      const c1x = p.x + (next.x - prev.x) / 6;
+      const c1y = p.y + (next.y - prev.y) / 6;
+      const c2x = next.x - (after.x - p.x) / 6;
+      const c2y = next.y - (after.y - p.y) / 6;
+      segments.push({
+        d: `M ${p.x} ${p.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${next.x} ${next.y}`,
+        from: p.quadrant,
+        to: next.quadrant,
+      });
+    }
+  }
 
   return (
     <svg
