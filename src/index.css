@@ -182,18 +182,14 @@ button {
    The .app-root flow is unaffected; this only changes what surface
    the backdrop is anchored to. */
 @media (display-mode: standalone) {
+  /* In PWA mode promote the backdrop layers to be viewport-anchored
+     so the aurora always paints to all four visible edges, even when
+     `.app-root`'s own height resolves a few pixels short. The shell
+     itself stays in normal flow (`default` status-bar mode reserves
+     the top, and the bottom reaches the home-indicator naturally). */
   .blobs,
   .grain {
     position: fixed;
-  }
-  /* iOS PWA can leave a strip below `.app-root` when `height: 100dvh`
-     doesn't include the home-indicator safe-area. Pin the shell to
-     the viewport directly so it always reaches all four edges. */
-  .app-root {
-    position: fixed;
-    inset: 0;
-    max-width: none;
-    margin: 0;
   }
 }
 
