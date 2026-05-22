@@ -9,7 +9,8 @@ import VoiceScreen from './screens/VoiceScreen';
 import EmotionGridScreen from './screens/EmotionGridScreen';
 import EmotionReviewScreen from './screens/EmotionReviewScreen';
 import LogDetailScreen from './screens/LogDetailScreen';
-import { MOCK_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
+import LogsScreen from './screens/LogsScreen';
+import { ALL_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
 import type { Detected } from './lib/emotionDetect';
 import type { EmotionSelection, Quadrant } from './theme/emotions';
 
@@ -30,10 +31,6 @@ type Screen =
 type DetailOrigin = 'home' | 'logs';
 
 const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
-  logs: {
-    title: 'Logs',
-    body: 'The log history screen (day / week / month / year) is the next screen to build.',
-  },
   chat: {
     title: 'Chat',
     body: 'The communications tab with your therapist is out of scope for this prototype.',
@@ -48,7 +45,7 @@ const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
-  const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
+  const [logs, setLogs] = useState<LogEntry[]>(ALL_LOGS);
 
   // Log-detail screen state — id of the log being viewed + where to return
   // to when the user hits ×.
@@ -216,6 +213,13 @@ export default function App() {
             />
           );
         })()}
+
+      {screen === 'logs' && (
+        <LogsScreen
+          logs={logs}
+          onOpenLog={(id) => openLogDetail(id, 'logs')}
+        />
+      )}
 
       {PLACEHOLDER[screen] && (
         <div className="placeholder" role="dialog" aria-modal="true">

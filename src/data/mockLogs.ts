@@ -163,3 +163,206 @@ export function logsForDay(dateKey: string, logs: LogEntry[]): LogEntry[] {
 export function quadrantsForDay(dateKey: string, logs: LogEntry[]) {
   return logsForDay(dateKey, logs).flatMap((l) => l.quadrants);
 }
+
+// ════════════════════════════════════════════════════════════════════
+// Historical mock seeding (~180 days back from TODAY). Deterministic
+// via a Mulberry32 PRNG seeded by a constant, so reloads are stable.
+// ════════════════════════════════════════════════════════════════════
+
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const SEED_VOCAB: Record<Quadrant, string[]> = {
+  hep: ['Happy', 'Excited', 'Grateful', 'Proud', 'Hopeful', 'Inspired'],
+  lep: ['Calm', 'Content', 'Peaceful', 'Relaxed', 'At ease', 'Thankful'],
+  hen: ['Anxious', 'Frustrated', 'Stressed', 'Angry', 'Tense', 'Overwhelmed'],
+  len: ['Sad', 'Tired', 'Lonely', 'Empty', 'Numb', 'Disappointed'],
+};
+const SEED_MODES: LogMode[] = ['speak', 'select', 'speak', 'select', 'select'];
+const SEED_QUADRANTS: Quadrant[] = ['hep', 'lep', 'hen', 'len'];
+
+/** Build ~180 days of plausible historical entries so the Month / Year
+ *  views have something to render. Determinism: same seed → same data. */
+function seedHistoricalLogs(): LogEntry[] {
+  const rand = mulberry32(0xC0FFEE);
+  const out: LogEntry[] = [];
+  // Walk backward from yesterday so we don't collide with today's
+  // hand-authored fixtures (which power the home empty/populated states).
+  const oldest = new Date(TODAY);
+  oldest.setDate(oldest.getDate() - 180);
+  oldest.setHours(0, 0, 0, 0);
+
+  let id = 0;
+  const cursor = new Date(oldest);
+  while (cursor < TODAY) {
+    const startOfWeekTuned = cursor.getDay(); // 0 Sun … 6 Sat
+    // Slight weekday bias so the bars look organic — fewer logs on weekends.
+    const baseCount = startOfWeekTuned === 0 || startOfWeekTuned === 6 ? 1 : 2;
+    const drift = rand() < 0.35 ? 1 : 0;
+    const skipDay = rand() < 0.18;
+    const count = skipDay ? 0 : baseCount + drift;
+
+    for (let i = 0; i < count; i++) {
+      const q = SEED_QUADRANTS[Math.floor(rand() * 4)];
+      const hour = 6 + Math.floor(rand() * 16); // 6am–9pm
+      const minute = Math.floor(rand() * 60);
+      const stamp = new Date(
+        cursor.getFullYear(),
+        cursor.getMonth(),
+        cursor.getDate(),
+        hour,
+        minute,
+      );
+      const vocab = SEED_VOCAB[q];
+      const kw1 = vocab[Math.floor(rand() * vocab.length)];
+      // ~40% chance of a second keyword from the same quadrant.
+      const kws = rand() < 0.4
+        ? [kw1, vocab[Math.floor(rand() * vocab.length)]].filter(
+            (k, idx, arr) => arr.indexOf(k) === idx,
+          )
+        : [kw1];
+      const mode = SEED_MODES[Math.floor(rand() * SEED_MODES.length)];
+      out.push({
+        id: `seed-${id++}`,
+        dateKey: dateKey(cursor),
+        time: formatClock(stamp),
+        ts: stamp.getTime(),
+        mode,
+        keywords: kws,
+        quadrants: [q],
+        chips: kws.map((k) => ({ text: k, quadrant: q })),
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
+}
+
+/** All logs — the seeded historical set plus the hand-authored fixtures
+ *  for the current week. Export as ALL_LOGS so consumers can opt in to
+ *  the full history (Logs screen) while the home week-card still uses
+ *  just MOCK_LOGS for its tight current-week behavior. */
+export const ALL_LOGS: LogEntry[] = [...seedHistoricalLogs(), ...MOCK_LOGS];
+
+// ════════════════════════════════════════════════════════════════════
+// Period helpers — used by the Logs D/W/M/Y views.
+// ════════════════════════════════════════════════════════════════════
+
+export type LogView = 'D' | 'W' | 'M' | 'Y';
+
+/** First date (00:00) of the period containing `d` for the given view. */
+export function periodStart(view: LogView, d: Date): Date {
+  const out = new Date(d);
+  out.setHours(0, 0, 0, 0);
+  if (view === 'D') return out;
+  if (view === 'W') {
+    out.setDate(out.getDate() - out.getDay()); // Sun
+    return out;
+  }
+  if (view === 'M') {
+    out.setDate(1);
+    return out;
+  }
+  // Y
+  out.setMonth(0, 1);
+  return out;
+}
+
+/** Move an anchor forward (+1) or backward (-1) by one period of `view`. */
+export function shiftPeriod(view: LogView, anchor: Date, dir: -1 | 1): Date {
+  const out = new Date(anchor);
+  if (view === 'D') out.setDate(out.getDate() + dir);
+  else if (view === 'W') out.setDate(out.getDate() + dir * 7);
+  else if (view === 'M') out.setMonth(out.getMonth() + dir);
+  else out.setFullYear(out.getFullYear() + dir);
+  return periodStart(view, out);
+}
+
+/** True when `anchor` covers a future period (forward chevron should disable). */
+export function isFuturePeriod(view: LogView, anchor: Date): boolean {
+  return periodStart(view, anchor).getTime() > periodStart(view, TODAY).getTime();
+}
+
+/** Pretty period label for the navigator: 'April 6 — April 13' / 'MARCH' / etc. */
+export function periodLabel(view: LogView, anchor: Date): string {
+  if (view === 'D') {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return `${dayNames[anchor.getDay()]}, ${anchor.getDate()} ${MONTHS[anchor.getMonth()]}`;
+  }
+  if (view === 'W') {
+    const end = new Date(anchor);
+    end.setDate(end.getDate() + 6);
+    return `${MONTHS[anchor.getMonth()]} ${anchor.getDate()} — ${MONTHS[end.getMonth()]} ${end.getDate()}`;
+  }
+  if (view === 'M') {
+    return `${[
+      'January','February','March','April','May','June','July','August','September','October','November','December',
+    ][anchor.getMonth()]}`.toUpperCase();
+  }
+  return String(anchor.getFullYear());
+}
+
+/** Date keys for every day in the current period. */
+export function periodDayKeys(view: LogView, anchor: Date): string[] {
+  if (view === 'D') return [dateKey(anchor)];
+  if (view === 'W') {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(anchor);
+      d.setDate(anchor.getDate() + i);
+      return dateKey(d);
+    });
+  }
+  if (view === 'M') {
+    const last = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate();
+    return Array.from({ length: last }, (_, i) => {
+      const d = new Date(anchor.getFullYear(), anchor.getMonth(), i + 1);
+      return dateKey(d);
+    });
+  }
+  // Y — return all dates in the year (used for year-breakdown bubble counts).
+  const days: string[] = [];
+  for (let m = 0; m < 12; m++) {
+    const last = new Date(anchor.getFullYear(), m + 1, 0).getDate();
+    for (let i = 1; i <= last; i++) days.push(dateKey(new Date(anchor.getFullYear(), m, i)));
+  }
+  return days;
+}
+
+/** All logs whose dateKey falls inside the given period. */
+export function logsInPeriod(
+  view: LogView,
+  anchor: Date,
+  source: LogEntry[],
+): LogEntry[] {
+  const keys = new Set(periodDayKeys(view, anchor));
+  return source.filter((l) => keys.has(l.dateKey));
+}
+
+/** Per-quadrant counts inside a period — drives the breakdown bubbles. */
+export function quadrantCountsInPeriod(
+  view: LogView,
+  anchor: Date,
+  source: LogEntry[],
+): Record<Quadrant, number> {
+  const out: Record<Quadrant, number> = { hep: 0, lep: 0, hen: 0, len: 0 };
+  for (const log of logsInPeriod(view, anchor, source)) {
+    // Count each quadrant the entry touched (multi-quadrant logs contribute
+    // to every quadrant they tagged).
+    for (const q of log.quadrants) out[q] = (out[q] ?? 0) + 1;
+  }
+  return out;
+}
+
+/** Parse a 'YYYY-MM-DD' key back to a Date at midnight local. */
+export function dateFromKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}

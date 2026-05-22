@@ -1601,3 +1601,285 @@ button {
   background: rgba(34, 34, 34, 0.25);
   cursor: default;
 }
+
+/* ════════════════════════════════════════════
+   Logs screen (D / W / M / Y views)
+   ════════════════════════════════════════════ */
+.logs-shell {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top, 0px));
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 20px 132px; /* clear the floating pill nav */
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.logs-shell::-webkit-scrollbar { display: none; }
+
+.logs-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  margin-top: 20px;
+}
+.logs-empty {
+  font-size: 14px;
+  color: var(--charcoal);
+  opacity: 0.5;
+  text-align: center;
+  padding: 28px 0;
+}
+
+.logs-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.logs-section__title {
+  text-align: center;
+  font-size: 18px;
+  color: var(--charcoal);
+}
+
+/* ── D/W/M/Y toggle ────────────────────────── */
+.dwmy {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  background: #ffffff;
+  border: 1px solid rgba(34, 34, 34, 0.06);
+  border-radius: var(--r-pill);
+  padding: 4px;
+  box-shadow: 0 2px 6px rgba(34, 34, 34, 0.04);
+}
+.dwmy__seg {
+  min-width: 56px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  opacity: 0.55;
+  background: transparent;
+  transition: background 0.18s, opacity 0.18s;
+}
+.dwmy__seg--on {
+  background: rgba(34, 34, 34, 0.08);
+  opacity: 1;
+}
+.dwmy__seg:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+
+/* ── Period navigator ──────────────────────── */
+.pnav {
+  display: grid;
+  grid-template-columns: 40px 1fr 40px;
+  align-items: center;
+  margin-top: 16px;
+  gap: 8px;
+}
+.pnav__chev {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--charcoal);
+}
+.pnav__chev:disabled { opacity: 0.25; cursor: default; }
+.pnav__chev:not(:disabled):active { transform: scale(0.95); }
+.pnav__chev:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+.pnav__label {
+  text-align: center;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  color: var(--charcoal);
+  letter-spacing: 0.02em;
+}
+
+/* ── Logs list (day view) ──────────────────── */
+.logs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── Day-mood line graph ───────────────────── */
+.day-mood {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+/* ── Week stacked bars ─────────────────────── */
+.week-bars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 10px;
+  padding: 12px 0 8px;
+}
+.week-bars__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.week-bars__col:disabled { cursor: default; }
+.week-bars__col:not(:disabled):active .week-bars__bar { transform: scale(0.98); }
+.week-bars__col:focus-visible .week-bars__bar {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+.week-bars__letter {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--charcoal);
+  opacity: 0.6;
+}
+.week-bars__col--today .week-bars__letter {
+  opacity: 1;
+  font-weight: 700;
+}
+.week-bars__bar {
+  width: 14px;
+  height: 240px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(34, 34, 34, 0.05);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.12s ease;
+}
+.week-bars__bar--empty {
+  background: transparent;
+  border: 1.5px dashed rgba(34, 34, 34, 0.18);
+}
+.week-bars__col--future .week-bars__bar--empty {
+  opacity: 0.55;
+}
+.week-bars__seg {
+  display: block;
+  width: 100%;
+}
+
+/* ── Month calendar grid ───────────────────── */
+.month-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 8px 0;
+}
+.month-grid__head {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--charcoal);
+  opacity: 0.55;
+  text-align: center;
+  letter-spacing: 0.04em;
+  padding-bottom: 4px;
+}
+.month-grid__cell {
+  background: none;
+  border: none;
+  padding: 0;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.month-grid__cell:disabled { cursor: default; }
+.month-grid__cell--pad { pointer-events: none; }
+.month-grid__cell:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.month-grid__dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: block;
+}
+.month-grid__dot--filled {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+.month-grid__dot--empty {
+  background: transparent;
+  border: 1.5px solid rgba(34, 34, 34, 0.18);
+}
+.month-grid__dot--future {
+  background: transparent;
+  border: 1.5px dashed rgba(34, 34, 34, 0.18);
+}
+.month-grid__cell--today .month-grid__dot {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+
+/* ── Year grid (4×3 month pies) ────────────── */
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px 12px;
+  padding: 8px 0;
+}
+.year-grid__cell {
+  background: none;
+  border: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.year-grid__cell:disabled { cursor: default; opacity: 0.7; }
+.year-grid__cell:focus-visible .year-grid__pie {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+  border-radius: 50%;
+}
+.year-grid__label {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  color: var(--charcoal);
+  opacity: 0.7;
+}
+.year-grid__pie {
+  width: 52px;
+  height: 52px;
+  display: block;
+}
+.year-grid__pie--empty {
+  border-radius: 50%;
+  border: 1.5px dashed rgba(34, 34, 34, 0.22);
+  background: transparent;
+}
+
+/* ── Breakdown bubbles ─────────────────────── */
+.breakdown {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
