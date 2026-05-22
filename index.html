@@ -7,16 +7,15 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
-    <!-- theme-color tints the iOS status bar background (and Android URL bar)
-         to a soft pastel that blends with the aurora gradient's warm side. -->
     <meta name="theme-color" content="#FFF7E0" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <!-- Reverted from black-translucent: that mode reshaped the iOS PWA
-         viewport math and left a tall gap below the pill nav. `default`
-         lets iOS reserve the status bar normally so the rest of the
-         layout reaches the home-indicator cleanly. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Translucent status bar so the aurora paints behind it.
+         To keep the bottom edge correct under this mode (iOS PWA can
+         shrink the layout viewport), the pill nav is moved to
+         position: fixed in standalone CSS — it anchors to the visual
+         viewport directly, not the (possibly shorter) app shell. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
