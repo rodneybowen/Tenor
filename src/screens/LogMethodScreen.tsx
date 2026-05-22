@@ -35,7 +35,6 @@ export default function LogMethodScreen({
 
   return (
     <div className="screen" id="log-method">
-      <div className="wordmark">Tenor</div>
       <div className="top-bar">
         <BackButton onClick={onBack} />
       </div>

@@ -322,7 +322,6 @@ export default function EmotionGridScreen({
 
   return (
     <div className="screen" id="emotion-grid">
-      <div className="wordmark">Tenor</div>
 
       <header className="eg-header">
         <BackButton onClick={onBack} />

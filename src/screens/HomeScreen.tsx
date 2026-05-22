@@ -23,7 +23,6 @@ export default function HomeScreen({ logs, onLog, onViewLogs, onOpenLog }: Props
 
   return (
     <div className="screen" id="home">
-      <div className="wordmark">Tenor</div>
 
       <div className="home-scroll">
         <header className="hero">

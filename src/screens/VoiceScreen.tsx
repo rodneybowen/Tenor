@@ -135,7 +135,6 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
 
   return (
     <div className="screen" id="voice">
-      <div className="wordmark">Tenor</div>
       <div className="top-bar">
         <BackButton
           onClick={() => {

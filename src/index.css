@@ -525,6 +525,44 @@ button {
   flex: 1;
 }
 
+/* ── App-level fade overlays ──────────────────
+   Fixed-position white gradients that visually "swallow" content
+   into the iOS safe-areas. Top fade matches the OS status bar color
+   (theme-color: #ffffff). Bottom fade gives the pill nav a clean
+   white plate to sit on and hides any content scrolling past it.
+   Pointer-events disabled so they never intercept touches. */
+.app-fade {
+  position: fixed;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+.app-fade--top {
+  top: 0;
+  /* Solid through the OS-reserved safe area + a small buffer, then
+     a soft fade so scrolling content dissolves into the bar. */
+  height: calc(env(safe-area-inset-top, 0px) + 36px);
+  background: linear-gradient(
+    to bottom,
+    #ffffff 0%,
+    #ffffff calc(env(safe-area-inset-top, 0px) + 8px),
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+.app-fade--bottom {
+  bottom: 0;
+  /* Tall enough to fully cover the pill nav + home indicator + a
+     ~50px fade strip above the nav for the disappearing-content effect. */
+  height: calc(env(safe-area-inset-bottom, 0px) + 138px);
+  background: linear-gradient(
+    to top,
+    #ffffff 0%,
+    #ffffff calc(env(safe-area-inset-bottom, 0px) + 88px),
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
 /* ── Floating pill nav ── */
 .pill-nav {
   position: absolute;

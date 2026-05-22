@@ -24,7 +24,6 @@ export default function EmotionReviewScreen({
 }: Props) {
   return (
     <div className="screen" id="emotion-review">
-      <div className="wordmark">Tenor</div>
       <div className="top-bar">
         <BackButton onClick={onBack} />
       </div>
