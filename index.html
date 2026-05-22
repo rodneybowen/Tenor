@@ -7,15 +7,15 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
     />
+    <!-- Soft warm pastel — tints the opaque iOS status bar so it
+         reads as a continuation of the aurora's warm side. -->
     <meta name="theme-color" content="#FFF7E0" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <!-- Translucent status bar so the aurora paints behind it.
-         To keep the bottom edge correct under this mode (iOS PWA can
-         shrink the layout viewport), the pill nav is moved to
-         position: fixed in standalone CSS — it anchors to the visual
-         viewport directly, not the (possibly shorter) app shell. -->
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- `default` keeps the bottom flush with the home indicator.
+         Translucent mode looks nicer at the top but breaks the bottom
+         in our PWA — bottom correctness wins. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

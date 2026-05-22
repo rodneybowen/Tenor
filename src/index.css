@@ -182,18 +182,12 @@ button {
    The .app-root flow is unaffected; this only changes what surface
    the backdrop is anchored to. */
 @media (display-mode: standalone) {
-  /* Backdrop layers anchor to the viewport so the aurora paints all
-     four visible edges, even if .app-root resolves a few pixels short. */
+  /* In PWA mode keep the backdrop layers viewport-anchored so the
+     aurora paints all four visible edges, even if .app-root
+     resolves a few pixels short. Pill nav stays in normal flow
+     under default status-bar mode so the bottom sits flush. */
   .blobs,
   .grain {
-    position: fixed;
-  }
-  /* Anchor the pill nav to the visual viewport directly. With
-     black-translucent + viewport-fit=cover, iOS sometimes leaves
-     .app-root shorter than the visible viewport; moving the nav out
-     of that frame keeps it pinned just above the home indicator
-     regardless of the shell's actual height. */
-  .pill-nav {
     position: fixed;
   }
 }
