@@ -18,6 +18,7 @@ import {
 } from '../data/mockLogs';
 import {
   dotBackground,
+  quadrantBlendBackground,
   quadrantColor,
   shadeQuadrant,
   type Quadrant,
@@ -42,6 +43,28 @@ const MONTH_NAMES_SHORT = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
+
+// Deterministic seeded PRNG so randomized bubble positions are stable per
+// (view, anchor) — same week always gets the same layout; switching views
+// reshuffles. Tiny inline helpers to avoid a separate utility module.
+function hashSeed(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 // ────────────────────────────────────────────────────────────────────
 // Top-level screen
@@ -88,43 +111,55 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
         />
 
         <div className="logs-body">
-          {view === 'D' && (
-            <DayBody
-              anchor={anchor}
-              logs={logs}
-              onOpenLog={onOpenLog}
-            />
-          )}
-          {view === 'W' && (
-            <WeekBody
-              anchor={anchor}
-              logs={logs}
-              onDrillToDay={(d) => drillTo('D', d)}
-            />
-          )}
-          {view === 'M' && (
-            <MonthBody
-              anchor={anchor}
-              logs={logs}
-              onDrillToDay={(d) => drillTo('D', d)}
-            />
-          )}
-          {view === 'Y' && (
-            <YearBody
-              anchor={anchor}
-              logs={logs}
-              onDrillToMonth={(m) => drillTo('M', m)}
-            />
-          )}
+          {/* Keyed wrapper → React unmounts/remounts on view change, so the
+              fade-up entry animation re-fires per switch. The visualization
+              for D/W/M/Y is structurally too different to tween element-by-
+              element; a clean crossfade reads better. */}
+          <div
+            key={`v-${view}-${anchor.toISOString()}`}
+            className="logs-view-anim"
+          >
+            {view === 'D' && (
+              <DayBody anchor={anchor} logs={logs} onOpenLog={onOpenLog} />
+            )}
+            {view === 'W' && (
+              <WeekBody
+                anchor={anchor}
+                logs={logs}
+                onDrillToDay={(d) => drillTo('D', d)}
+              />
+            )}
+            {view === 'M' && (
+              <MonthBody
+                anchor={anchor}
+                logs={logs}
+                onDrillToDay={(d) => drillTo('D', d)}
+              />
+            )}
+            {view === 'Y' && (
+              <YearBody
+                anchor={anchor}
+                logs={logs}
+                onDrillToMonth={(m) => drillTo('M', m)}
+              />
+            )}
+          </div>
 
           {/* The bubble breakdown — shared by every view except Day, which
-              renders the line graph in its place. */}
+              renders the line graph in its place. Keyed so the bubbles get
+              fresh randomized positions per (view, anchor) and animate in. */}
           {view !== 'D' && (
-            <Breakdown
-              view={view}
-              counts={quadrantCountsInPeriod(view, anchor, logs)}
-              empty={periodLogs.length === 0}
-            />
+            <div
+              key={`b-${view}-${anchor.toISOString()}`}
+              className="logs-view-anim"
+            >
+              <Breakdown
+                view={view}
+                counts={quadrantCountsInPeriod(view, anchor, logs)}
+                empty={periodLogs.length === 0}
+                seed={`${view}-${anchor.toISOString()}`}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -517,49 +552,15 @@ function YearBody({
             {total === 0 || isFutureMonth ? (
               <span className="year-grid__pie year-grid__pie--empty" />
             ) : (
-              <MonthPie counts={counts} total={total} />
+              <span
+                className="year-grid__pie year-grid__pie--blend"
+                style={{ background: quadrantBlendBackground(counts) }}
+              />
             )}
           </button>
         );
       })}
     </div>
-  );
-}
-
-function MonthPie({ counts, total }: { counts: Record<Quadrant, number>; total: number }) {
-  const r = 24;
-  const c = r + 2;
-  // Conic-like SVG slices via path arcs.
-  let acc = 0;
-  return (
-    <svg className="year-grid__pie" viewBox={`0 0 ${(c) * 2} ${(c) * 2}`}>
-      {QUAD_ORDER.map((q) => {
-        const v = counts[q];
-        if (v === 0) return null;
-        const frac = v / total;
-        const start = acc;
-        const end = acc + frac;
-        acc = end;
-        const a0 = start * Math.PI * 2 - Math.PI / 2;
-        const a1 = end * Math.PI * 2 - Math.PI / 2;
-        const x0 = c + r * Math.cos(a0);
-        const y0 = c + r * Math.sin(a0);
-        const x1 = c + r * Math.cos(a1);
-        const y1 = c + r * Math.sin(a1);
-        const large = frac > 0.5 ? 1 : 0;
-        // Full circle → render as a circle to avoid the start==end degenerate arc.
-        if (frac === 1) {
-          return <circle key={q} cx={c} cy={c} r={r} fill={quadrantColor(q, 0.85)} />;
-        }
-        return (
-          <path
-            key={q}
-            d={`M ${c} ${c} L ${x0} ${y0} A ${r} ${r} 0 ${large} 1 ${x1} ${y1} Z`}
-            fill={quadrantColor(q, 0.85)}
-          />
-        );
-      })}
-    </svg>
   );
 }
 
@@ -578,10 +579,12 @@ function Breakdown({
   view,
   counts,
   empty,
+  seed,
 }: {
   view: LogView;
   counts: Record<Quadrant, number>;
   empty: boolean;
+  seed: string;
 }) {
   return (
     <section className="logs-section">
@@ -589,15 +592,20 @@ function Breakdown({
       {empty ? (
         <p className="logs-empty">no logs in this period</p>
       ) : (
-        <BreakdownBubbles counts={counts} />
+        <BreakdownBubbles counts={counts} seed={seed} />
       )}
     </section>
   );
 }
 
-function BreakdownBubbles({ counts }: { counts: Record<Quadrant, number> }) {
-  // Sort by count desc so the largest bubble anchors near the visual center
-  // and smaller bubbles cluster around it.
+function BreakdownBubbles({
+  counts,
+  seed,
+}: {
+  counts: Record<Quadrant, number>;
+  seed: string;
+}) {
+  // Sort by count desc so the largest bubble leads (left).
   const items = QUAD_ORDER
     .map((q) => ({ q, n: counts[q] }))
     .filter((x) => x.n > 0)
@@ -605,40 +613,88 @@ function BreakdownBubbles({ counts }: { counts: Record<Quadrant, number> }) {
 
   if (items.length === 0) return null;
 
+  const total = items.reduce((s, x) => s + x.n, 0);
   const maxN = items[0].n;
-  // Area-proportional radii. Tighter ceiling (46) keeps the cluster from
-  // dominating the 320×200 viewBox when 3–4 quadrants are present.
-  const radii = items.map((x) => Math.max(16, Math.min(46, 14 + Math.sqrt(x.n / maxN) * 32)));
+  const rng = mulberry32(hashSeed(seed));
 
-  // Hand-tuned anchors with enough separation that ~46px bubbles only just
-  // graze each other — reads as a loose cluster, not a Venn diagram.
-  const anchors: { x: number; y: number }[] = [
-    { x: 90, y: 90 },   // largest
-    { x: 215, y: 70 },  // upper-right
-    { x: 175, y: 160 }, // bottom-center
-    { x: 270, y: 155 }, // bottom-right
-  ];
+  // Area-proportional radii. Max radius is capped so even 4 max-sized
+  // bubbles fit horizontally with comfortable gaps + Y-jitter headroom,
+  // never clipping the viewBox.
+  const R_MAX = 30;
+  const R_MIN = 16;
+  const radii = items.map((x) =>
+    Math.max(R_MIN, Math.min(R_MAX, R_MIN + Math.sqrt(x.n / maxN) * (R_MAX - R_MIN))),
+  );
+
+  // Left-to-right packing: each bubble's center is offset by its own
+  // radius plus the previous bubble's radius plus the gap.
+  const W = 320;
+  const H = 200;
+  const gap = 12;
+  const cy = H / 2;
+  const totalRowW =
+    radii.reduce((s, r) => s + r * 2, 0) + (radii.length - 1) * gap;
+  const startX = (W - totalRowW) / 2;
+  let cursor = startX;
+  // Per-(view, anchor) randomized jitter so the cluster looks different
+  // in W vs M vs Y — but stays deterministic per pair so re-entering a
+  // period gives the same layout.
+  const positions = radii.map((r) => {
+    const x = cursor + r;
+    cursor += r * 2 + gap;
+    // Y offset within ±18 so the bubble is never within R_MAX of the edge.
+    const yOffset = (rng() - 0.5) * 36;
+    const xOffset = (rng() - 0.5) * 8;
+    return { x: x + xOffset, y: cy + yOffset };
+  });
 
   return (
     <svg
       className="breakdown"
-      viewBox="0 0 320 200"
+      viewBox={`0 0 ${W} ${H}`}
       role="img"
-      aria-label="Quadrant breakdown"
+      aria-label="Quadrant breakdown by share"
     >
       {items.map((item, i) => {
         const r = radii[i];
-        const { x, y } = anchors[i];
+        const { x, y } = positions[i];
+        const pct = Math.round((item.n / total) * 100);
+        const fontSize = Math.max(12, r * 0.5);
+        // Each bubble gets its own subtle, randomized drift cycle so the
+        // cluster looks gently alive instead of mechanical.
+        const driftStyle = {
+          '--fx': `${(rng() - 0.5) * 6}px`,
+          '--fy': `${(rng() - 0.5) * 6}px`,
+          '--float-dur': `${7 + rng() * 4}s`,
+          '--float-delay': `${rng() * -6}s`,
+        } as React.CSSProperties;
         return (
-          <circle
+          <g
             key={item.q}
-            cx={x}
-            cy={y}
-            r={r}
-            fill={quadrantColor(item.q, 0.7)}
-            stroke={shadeQuadrant(item.q, 0.3, 0.8)}
-            strokeWidth={1.5}
-          />
+            className="breakdown__bubble"
+            style={driftStyle}
+          >
+            <circle
+              cx={x}
+              cy={y}
+              r={r}
+              fill={quadrantColor(item.q, 1)}
+              stroke={shadeQuadrant(item.q, 0.28, 0.6)}
+              strokeWidth={1}
+            />
+            <text
+              x={x}
+              y={y}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={fontSize}
+              fontWeight={600}
+              fontFamily="var(--font-sans)"
+              fill="var(--charcoal)"
+            >
+              {pct}%
+            </text>
+          </g>
         );
       })}
     </svg>

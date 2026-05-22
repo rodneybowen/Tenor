@@ -132,6 +132,52 @@ export function shadeQuadrant(q: Quadrant, amt: number, alpha = 1): string {
 }
 
 /**
+ * Soft, blurry circular blend representing per-quadrant counts. Each
+ * quadrant is anchored to its own corner of the circle (matching the
+ * emotion-grid layout) and renders as a radial-gradient layer. The
+ * **most prevalent** quadrant paints last with the largest radius and
+ * strongest alpha — so it visibly dominates the blob — while the
+ * remaining quadrants leave faint accent tints in their corners.
+ * Returns a `background` value (CSS multi-radial-gradient stack).
+ */
+export function quadrantBlendBackground(
+  counts: Partial<Record<Quadrant, number>>,
+): string {
+  const items = (Object.keys(QUADRANTS) as Quadrant[])
+    .map((q) => ({ q, n: counts[q] ?? 0 }))
+    .filter((x) => x.n > 0);
+  if (items.length === 0) return 'transparent';
+
+  const total = items.reduce((s, x) => s + x.n, 0);
+
+  // Corner anchors: HEP top-left, HEN top-right, LEP bottom-left, LEN bottom-right
+  // (matches the emotion-grid quadrant positions).
+  const corners: Record<Quadrant, [number, number]> = {
+    hep: [22, 22],
+    hen: [78, 22],
+    lep: [22, 78],
+    len: [78, 78],
+  };
+
+  // Paint smallest first so largest sits on top.
+  const sorted = [...items].sort((a, b) => a.n - b.n);
+  const layers = sorted.map(({ q, n }, idx) => {
+    const frac = n / total;
+    const [x, y] = corners[q];
+    const isMost = idx === sorted.length - 1;
+    // Dominant gets a wide, near-opaque wash; minor accents stay subtle.
+    const alpha = isMost ? Math.min(1, 0.7 + frac * 0.3) : 0.3 + frac * 0.35;
+    const radius = isMost ? 80 : 35 + frac * 25;
+    return `radial-gradient(circle at ${x}% ${y}%, ${quadrantColor(
+      q,
+      alpha,
+    )} 0%, transparent ${radius}%)`;
+  });
+
+  return layers.join(', ');
+}
+
+/**
  * Fill for a day dot — always a soft gradient. A single emotion reads as a
  * gently lit sphere of that hue; multiple emotions melt smoothly into one
  * another (no hard pie slices).

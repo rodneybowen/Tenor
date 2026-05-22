@@ -1876,10 +1876,54 @@ button {
   border: 1.5px dashed rgba(34, 34, 34, 0.22);
   background: transparent;
 }
+.year-grid__pie--blend {
+  /* Multiple radial gradients (one per quadrant present that month) get
+     clipped to a circle. The most prevalent quadrant paints largest +
+     most opaque so it visibly dominates the blob. */
+  border-radius: 50%;
+  background-color: #f4f2f0;
+  box-shadow: 0 1px 3px rgba(34, 34, 34, 0.08);
+}
 
 /* ── Breakdown bubbles ─────────────────────── */
 .breakdown {
   width: 100%;
   height: 200px;
   display: block;
+  overflow: visible;
+}
+
+/* Subtle per-bubble drift so the cluster feels gently alive. CSS custom
+   props supply randomized amplitude, duration, and start delay per bubble
+   (set inline from the seeded PRNG) — bubbles don't synchronize. */
+@keyframes bubble-float {
+  0%,
+  100% { transform: translate(0, 0); }
+  50% { transform: translate(var(--fx, 3px), var(--fy, -3px)); }
+}
+.breakdown__bubble {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: bubble-float var(--float-dur, 9s) ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+}
+
+/* Fade-up entry for each D/W/M/Y body and for the breakdown when the view
+   changes. Keyed on `${view}-${anchor}` so it re-fires per switch. */
+@keyframes logs-view-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.logs-view-anim {
+  animation: logs-view-fade-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .breakdown__bubble { animation: none; }
+  .logs-view-anim { animation: none; }
 }
