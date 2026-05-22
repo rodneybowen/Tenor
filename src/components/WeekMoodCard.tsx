@@ -13,12 +13,14 @@ interface Props {
   logs: LogEntry[];
   selectedKey: string;
   onSelectDay: (dateKey: string) => void;
+  onOpenLog?: (id: string) => void;
 }
 
 export default function WeekMoodCard({
   logs,
   selectedKey,
   onSelectDay,
+  onOpenLog,
 }: Props) {
   const week = getWeek();
   const selectedDay = week.find((d) => d.dateKey === selectedKey) ?? week[0];
@@ -73,7 +75,7 @@ export default function WeekMoodCard({
       {dayLogs.length > 0 ? (
         <div className="log-list">
           {dayLogs.map((entry) => (
-            <LogEntryCard key={entry.id} entry={entry} />
+            <LogEntryCard key={entry.id} entry={entry} onOpen={onOpenLog} />
           ))}
         </div>
       ) : (

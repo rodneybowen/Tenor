@@ -8,7 +8,7 @@ import LogMethodScreen from './screens/LogMethodScreen';
 import VoiceScreen from './screens/VoiceScreen';
 import EmotionGridScreen from './screens/EmotionGridScreen';
 import EmotionReviewScreen from './screens/EmotionReviewScreen';
-import ConfirmationScreen from './screens/ConfirmationScreen';
+import LogDetailScreen from './screens/LogDetailScreen';
 import { MOCK_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
 import type { Detected } from './lib/emotionDetect';
 import type { EmotionSelection, Quadrant } from './theme/emotions';
@@ -19,12 +19,15 @@ type Screen =
   | 'voice'
   | 'emotionGrid'
   | 'emotionReview'
-  | 'confirmation'
+  | 'logDetail'
   | 'logs'
   | 'chat'
   | 'account';
 
-type ConfirmMode = 'speak' | 'select';
+/** Where the user came from when entering the log-detail screen. The × close
+ *  button uses this to return them to the right spot (home after a fresh
+ *  log, or the logs history if they were tapping into a past log there). */
+type DetailOrigin = 'home' | 'logs';
 
 const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
   logs: {
@@ -47,17 +50,17 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [logs, setLogs] = useState<LogEntry[]>(MOCK_LOGS);
 
-  // Speak flow + emotion flow both end up on the same Confirmation screen.
-  const [confirmChips, setConfirmChips] = useState<Detected[]>([]);
-  const [confirmTime, setConfirmTime] = useState('');
-  const [confirmMode, setConfirmMode] = useState<ConfirmMode>('speak');
+  // Log-detail screen state — id of the log being viewed + where to return
+  // to when the user hits ×.
+  const [viewingLogId, setViewingLogId] = useState<string | null>(null);
+  const [detailOrigin, setDetailOrigin] = useState<DetailOrigin>('home');
 
   // Emotion-selector flow state
   const [entryQuadrant, setEntryQuadrant] = useState<Quadrant>('hep');
   const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
   const [emotionContext, setEmotionContext] = useState('');
 
-  function submitVoiceLog(chips: Detected[]) {
+  function submitVoiceLog(chips: Detected[], transcript: string) {
     const now = new Date();
     const time = formatClock(now);
     const quadrants = Array.from(
@@ -71,12 +74,11 @@ export default function App() {
       mode: 'speak',
       keywords: chips.map((c) => c.text),
       quadrants,
+      body: transcript,
+      chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
     };
     setLogs((prev) => [...prev, entry]);
-    setConfirmChips(chips);
-    setConfirmTime(time);
-    setConfirmMode('speak');
-    setScreen('confirmation');
+    openLogDetail(entry.id, 'home');
   }
 
   function pickQuadrant(q: Quadrant) {
@@ -112,16 +114,29 @@ export default function App() {
       mode: 'select',
       keywords: emotionSelected.map((s) => s.name),
       quadrants,
+      body: emotionContext.trim() || undefined,
+      chips: emotionSelected.map((s) => ({ text: s.name, quadrant: s.quadrant })),
     };
     setLogs((prev) => [...prev, entry]);
-    // Reuse the Confirmation screen's chip shape so it can render the
-    // same colored pills the Speak flow does.
-    setConfirmChips(
-      emotionSelected.map((s) => ({ text: s.name, quadrant: s.quadrant })),
-    );
-    setConfirmTime(time);
-    setConfirmMode('select');
-    setScreen('confirmation');
+    openLogDetail(entry.id, 'home');
+  }
+
+  // ── Log-detail routing ─────────────────────────────────────────────
+  function openLogDetail(id: string, origin: DetailOrigin) {
+    setViewingLogId(id);
+    setDetailOrigin(origin);
+    setScreen('logDetail');
+  }
+  function closeLogDetail() {
+    // Send the user back to wherever they entered from. 'logs' is still a
+    // placeholder for now; routing to it just shows that placeholder.
+    setScreen(detailOrigin);
+  }
+  function addToThisLog() {
+    // TODO: implement true append semantics — for the prototype this just
+    // opens a fresh log-method flow. The new entry becomes its own log; we'll
+    // refactor to attach it to the parent log when the data model grows.
+    setScreen('logMethod');
   }
 
   function handleNav(tab: NavTab) {
@@ -148,6 +163,7 @@ export default function App() {
           logs={logs}
           onLog={() => setScreen('logMethod')}
           onViewLogs={() => setScreen('logs')}
+          onOpenLog={(id) => openLogDetail(id, 'home')}
         />
       )}
 
@@ -188,15 +204,18 @@ export default function App() {
         />
       )}
 
-      {screen === 'confirmation' && (
-        <ConfirmationScreen
-          chips={confirmChips}
-          time={confirmTime}
-          mode={confirmMode}
-          onAddAnother={() => setScreen('logMethod')}
-          onViewLogs={() => setScreen('home')}
-        />
-      )}
+      {screen === 'logDetail' && viewingLogId &&
+        (() => {
+          const log = logs.find((l) => l.id === viewingLogId);
+          if (!log) return null;
+          return (
+            <LogDetailScreen
+              log={log}
+              onClose={closeLogDetail}
+              onAddToLog={addToThisLog}
+            />
+          );
+        })()}
 
       {PLACEHOLDER[screen] && (
         <div className="placeholder" role="dialog" aria-modal="true">

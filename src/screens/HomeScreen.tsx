@@ -15,9 +15,10 @@ interface Props {
   logs: LogEntry[];
   onLog: () => void;
   onViewLogs: () => void;
+  onOpenLog?: (id: string) => void;
 }
 
-export default function HomeScreen({ logs, onLog, onViewLogs }: Props) {
+export default function HomeScreen({ logs, onLog, onViewLogs, onOpenLog }: Props) {
   const [selectedKey, setSelectedKey] = useState(TODAY_KEY);
 
   return (
@@ -49,6 +50,7 @@ export default function HomeScreen({ logs, onLog, onViewLogs }: Props) {
           logs={logs}
           selectedKey={selectedKey}
           onSelectDay={setSelectedKey}
+          onOpenLog={onOpenLog}
         />
 
         <div className="card-actions">

@@ -12,6 +12,14 @@ export interface LogEntry {
   keywords: string[];
   /** emotion quadrant(s) this entry touched — drives dot + card colors */
   quadrants: Quadrant[];
+  /** raw context the user produced — the transcript (speak), the typed
+   *  text (type/scan, later), or the optional "what made you feel that
+   *  way" note (emotion-selector). Empty/undefined for chip-only logs. */
+  body?: string;
+  /** per-keyword quadrant tagging, when available — used so the log
+   *  detail screen can color each chip by its own quadrant. Parallel
+   *  to `keywords`. Falls back to `quadrants[0]` for legacy mock logs. */
+  chips?: { text: string; quadrant: Quadrant | null }[];
 }
 
 export interface WeekDay {

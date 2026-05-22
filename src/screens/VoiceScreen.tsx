@@ -26,7 +26,7 @@ const DEMO_SCRIPT =
 interface Props {
   demo: boolean;
   onBack: () => void;
-  onConfirm: (chips: Detected[]) => void;
+  onConfirm: (chips: Detected[], transcript: string) => void;
 }
 
 function chipStyle(q: Detected['quadrant']) {
@@ -267,7 +267,12 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
               className="round-btn round-btn--confirm"
               aria-label="Confirm and add to log"
               disabled={chips.filter((c) => c.text.trim()).length === 0}
-              onClick={() => onConfirm(chips.filter((c) => c.text.trim()))}
+              onClick={() =>
+                onConfirm(
+                  chips.filter((c) => c.text.trim()),
+                  transcriptRef.current.trim(),
+                )
+              }
             >
               <Check size={24} weight="bold" />
             </button>

@@ -16,13 +16,29 @@ const MODE_LABEL: Record<LogMode, string> = {
   select: 'Emotion picker',
 };
 
-export default function LogEntryCard({ entry }: { entry: LogEntry }) {
+interface Props {
+  entry: LogEntry;
+  onOpen?: (id: string) => void;
+}
+
+export default function LogEntryCard({ entry, onOpen }: Props) {
   const ModeIcon = MODE_ICON[entry.mode];
+  const clickable = !!onOpen;
 
   return (
     <article
-      className="log-card"
+      className={'log-card' + (clickable ? ' log-card--interactive' : '')}
       style={{ background: blendGradient(entry.quadrants) }}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      aria-label={clickable ? `Open log from ${entry.time}` : undefined}
+      onClick={() => onOpen?.(entry.id)}
+      onKeyDown={(e) => {
+        if (clickable && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onOpen?.(entry.id);
+        }
+      }}
     >
       <div className="log-card__body">
         <div className="log-card__keywords">
