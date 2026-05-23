@@ -1140,9 +1140,10 @@ button {
 .ld-body {
   position: absolute;
   top: calc(max(16px, env(safe-area-inset-top, 0px)) + 60px);
-  /* Leaves room for the actions stack — primary + (optional) secondary
-     + gap + safe-area-aware bottom inset. */
-  bottom: calc(max(24px, env(safe-area-inset-bottom, 24px)) + 124px);
+  /* Leaves room for the actions stack — confirm row + primary + secondary
+     + gaps + safe-area-aware bottom inset. Sized for the tallest variant
+     (post-log) so past-log layouts just have a bit more breathing room. */
+  bottom: calc(max(24px, env(safe-area-inset-bottom, 24px)) + 156px);
   left: 24px;
   right: 24px;
   display: flex;
@@ -1228,6 +1229,25 @@ button {
 .ld-actions .btn-primary,
 .ld-actions .btn-secondary {
   width: 100%;
+}
+/* "logged successfully" confirmation row — sits directly above the
+   primary back-to-home button after a fresh submission. Label-style
+   (Montserrat Light 16px) per the design system, with a vivid Spring
+   Green 600 check so success reads at a glance. */
+.ld-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0 0 2px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 300;
+  color: var(--charcoal);
+}
+.ld-confirm svg {
+  color: #01B837;
+  flex-shrink: 0;
 }
 
 /* Make week-card log entries feel interactive when a click handler is

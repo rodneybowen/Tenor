@@ -1,4 +1,4 @@
-import { House, Plus, X } from '@phosphor-icons/react';
+import { CheckCircle, House, Plus, X } from '@phosphor-icons/react';
 import { type LogEntry } from '../data/mockLogs';
 import { quadrantColor, type Quadrant } from '../theme/emotions';
 
@@ -117,6 +117,10 @@ export default function LogDetailScreen({
       <div className="ld-actions">
         {justSubmitted ? (
           <>
+            <p className="ld-confirm" aria-live="polite">
+              <CheckCircle size={16} weight="fill" />
+              logged successfully
+            </p>
             <button type="button" className="btn-primary" onClick={onClose}>
               <House size={16} weight="regular" />
               back to home
