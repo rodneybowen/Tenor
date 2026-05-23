@@ -53,6 +53,25 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
   const transcriptRef = useRef('');
   transcriptRef.current = sr.transcript;
 
+  // Auto-scroll the transcript to the bottom as new words come in, so the
+  // user never sees a frozen-looking screen while they're still talking.
+  // We only auto-stick when the user is already near the bottom — if they
+  // scrolled up to re-read earlier text, leave them there.
+  const transcriptElRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+  function onTranscriptScroll() {
+    const el = transcriptElRef.current;
+    if (!el) return;
+    const distFromBottom = el.scrollHeight - el.clientHeight - el.scrollTop;
+    stickToBottomRef.current = distFromBottom < 24;
+  }
+  useEffect(() => {
+    if (stickToBottomRef.current) {
+      const el = transcriptElRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+    }
+  }, [sr.transcript, sr.interim]);
+
   function clearDemo() {
     if (demoTimer.current) {
       clearInterval(demoTimer.current);
@@ -149,7 +168,12 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
         <div className="voice-body">
           <h1 className="voice-title">Say it out loud.</h1>
 
-          <div className="transcript" aria-live="polite">
+          <div
+            className="transcript"
+            aria-live="polite"
+            ref={transcriptElRef}
+            onScroll={onTranscriptScroll}
+          >
             {tokens.length === 0 && !sr.interim ? (
               <span className="transcript__hint">
                 {capturing ? 'listening…' : 'getting ready…'}
