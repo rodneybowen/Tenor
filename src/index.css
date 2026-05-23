@@ -1140,7 +1140,9 @@ button {
 .ld-body {
   position: absolute;
   top: calc(max(16px, env(safe-area-inset-top, 0px)) + 60px);
-  bottom: 112px;
+  /* Leaves room for the actions stack — primary + (optional) secondary
+     + gap + safe-area-aware bottom inset. */
+  bottom: calc(max(24px, env(safe-area-inset-bottom, 24px)) + 124px);
   left: 24px;
   right: 24px;
   display: flex;
@@ -1219,9 +1221,12 @@ button {
   right: 24px;
   bottom: max(24px, env(safe-area-inset-bottom, 24px));
   display: flex;
+  flex-direction: column;
+  gap: 10px;
   z-index: 5;
 }
-.ld-actions .btn-primary {
+.ld-actions .btn-primary,
+.ld-actions .btn-secondary {
   width: 100%;
 }
 

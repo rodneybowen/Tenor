@@ -28,7 +28,7 @@ type Screen =
 /** Where the user came from when entering the log-detail screen. The × close
  *  button uses this to return them to the right spot (home after a fresh
  *  log, or the logs history if they were tapping into a past log there). */
-type DetailOrigin = 'home' | 'logs';
+type DetailOrigin = 'home' | 'logs' | 'post-log';
 
 const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
   chat: {
@@ -75,7 +75,7 @@ export default function App() {
       chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
     };
     setLogs((prev) => [...prev, entry]);
-    openLogDetail(entry.id, 'home');
+    openLogDetail(entry.id, 'post-log');
   }
 
   function pickQuadrant(q: Quadrant) {
@@ -115,7 +115,7 @@ export default function App() {
       chips: emotionSelected.map((s) => ({ text: s.name, quadrant: s.quadrant })),
     };
     setLogs((prev) => [...prev, entry]);
-    openLogDetail(entry.id, 'home');
+    openLogDetail(entry.id, 'post-log');
   }
 
   // ── Log-detail routing ─────────────────────────────────────────────
@@ -125,9 +125,9 @@ export default function App() {
     setScreen('logDetail');
   }
   function closeLogDetail() {
-    // Send the user back to wherever they entered from. 'logs' is still a
-    // placeholder for now; routing to it just shows that placeholder.
-    setScreen(detailOrigin);
+    // Send the user back to wherever they entered from. Post-log returns
+    // to home (most natural after-submission destination).
+    setScreen(detailOrigin === 'post-log' ? 'home' : detailOrigin);
   }
   function addToThisLog() {
     // TODO: implement true append semantics — for the prototype this just
@@ -208,6 +208,7 @@ export default function App() {
           return (
             <LogDetailScreen
               log={log}
+              justSubmitted={detailOrigin === 'post-log'}
               onClose={closeLogDetail}
               onAddToLog={addToThisLog}
             />

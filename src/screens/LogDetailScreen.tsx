@@ -1,11 +1,16 @@
-import { Plus, X } from '@phosphor-icons/react';
+import { House, Plus, X } from '@phosphor-icons/react';
 import { type LogEntry } from '../data/mockLogs';
 import { quadrantColor, type Quadrant } from '../theme/emotions';
 
 interface Props {
   log: LogEntry;
-  /** Where to go when × is hit (post-log → home; from week-card → home; from
-   *  logs history → logs). The parent decides; this screen just calls it. */
+  /** True when the user just finished submitting a new log. Changes the
+   *  layout: instead of the corner × + "+ add" primary, we show a stacked
+   *  primary "back to home" + secondary "+ add to this log" at the bottom
+   *  (most natural action ordering immediately after a submission). */
+  justSubmitted?: boolean;
+  /** Where to go when × (or the post-log primary) is hit. The parent decides;
+   *  this screen just calls it. */
   onClose: () => void;
   onAddToLog: () => void;
 }
@@ -41,21 +46,31 @@ function bodyFor(log: LogEntry): { text: string; empty: boolean } {
   return { text: '', empty: true };
 }
 
-export default function LogDetailScreen({ log, onClose, onAddToLog }: Props) {
+export default function LogDetailScreen({
+  log,
+  justSubmitted = false,
+  onClose,
+  onAddToLog,
+}: Props) {
   const date = formatLogDate(log.dateKey);
   const quads = chipQuadrants(log);
   const { text: body, empty: bodyEmpty } = bodyFor(log);
 
   return (
     <div className="screen" id="log-detail">
-      <button
-        type="button"
-        className="ld-close"
-        aria-label="Close"
-        onClick={onClose}
-      >
-        <X size={20} weight="bold" />
-      </button>
+      {/* Corner close only when the user is *viewing* a past log; after a
+          fresh submission the close action lives at the bottom as a
+          primary "back to home" button instead. */}
+      {!justSubmitted && (
+        <button
+          type="button"
+          className="ld-close"
+          aria-label="Close"
+          onClick={onClose}
+        >
+          <X size={20} weight="bold" />
+        </button>
+      )}
 
       <div className="ld-body">
         <header className="ld-header">
@@ -100,10 +115,23 @@ export default function LogDetailScreen({ log, onClose, onAddToLog }: Props) {
       </div>
 
       <div className="ld-actions">
-        <button type="button" className="btn-primary" onClick={onAddToLog}>
-          <Plus size={16} weight="bold" />
-          add to this log
-        </button>
+        {justSubmitted ? (
+          <>
+            <button type="button" className="btn-primary" onClick={onClose}>
+              <House size={16} weight="regular" />
+              back to home
+            </button>
+            <button type="button" className="btn-secondary" onClick={onAddToLog}>
+              <Plus size={16} weight="bold" />
+              add to this log
+            </button>
+          </>
+        ) : (
+          <button type="button" className="btn-primary" onClick={onAddToLog}>
+            <Plus size={16} weight="bold" />
+            add to this log
+          </button>
+        )}
       </div>
     </div>
   );
