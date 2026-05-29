@@ -24,7 +24,18 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Supabase credentials must be present at BUILD time — Vite
+      # inlines `import.meta.env.VITE_*` values into the static bundle.
+      # Set both as repo secrets:
+      #   Settings → Secrets and variables → Actions → New repository secret
+      #     • VITE_SUPABASE_URL        (Project URL, e.g. https://abc.supabase.co)
+      #     • VITE_SUPABASE_ANON_KEY   (anon/public key — safe to ship)
+      # If they're missing the build still succeeds, but the deployed app
+      # falls back to the in-memory mock data (no auth, no DB).
       - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
