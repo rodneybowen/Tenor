@@ -34,9 +34,19 @@ export interface WeekDay {
   isFuture: boolean;
 }
 
-// Fixed reference "now" so the prototype is deterministic: Thu 21 May 2026.
-// No persistence — refreshing resets everything (matches prototype scope).
-export const TODAY = new Date(2026, 4, 21, 9, 30);
+// "Now" — evaluated at module load. The week card, greeting, and the
+// `date_key` we stamp on freshly-submitted logs all derive from this,
+// so the app reflects the user's actual local date/time on every load.
+//
+// Caveat: if the app stays open across midnight, TODAY won't roll over
+// until the user refreshes. Acceptable for the prototype; lift this
+// into a state hook (poll every minute / on visibilitychange) if it
+// becomes a real UX issue.
+//
+// Mock historical seed below positions itself relative to TODAY, so
+// dev-mode (no Supabase env vars) demos against the actual current
+// week instead of a fixed May 2026 baseline.
+export const TODAY = new Date();
 
 const DAY_LETTERS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
