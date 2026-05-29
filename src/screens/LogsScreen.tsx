@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 import {
   TODAY,
@@ -319,7 +319,18 @@ function DayMoodLine({ logs }: { logs: LogEntry[] }) {
   //     steeply upward — reads as "slowly but surely uplifting"
   // Three-or-more-point days use a Catmull-Rom cubic spline so the line
   // is C1-continuous through every interior point (no "glued segments").
-  type Segment = { d: string; from: Quadrant; to: Quadrant };
+  // fromX/Y/toX/toY capture the chord endpoints so each segment can
+  // host its own linearGradient running between the two points in
+  // user-space coords — colors flow smoothly along the curve.
+  type Segment = {
+    d: string;
+    from: Quadrant;
+    to: Quadrant;
+    fromX: number;
+    fromY: number;
+    toX: number;
+    toY: number;
+  };
   const segments: Segment[] = [];
 
   if (points.length === 2) {
@@ -344,6 +355,10 @@ function DayMoodLine({ logs }: { logs: LogEntry[] }) {
         d: `M ${p.x} ${p.y} Q ${cx} ${cy} ${next.x} ${next.y}`,
         from: p.quadrant,
         to: next.quadrant,
+        fromX: p.x,
+        fromY: p.y,
+        toX: next.x,
+        toY: next.y,
       });
     }
   } else if (points.length >= 3) {
@@ -362,9 +377,17 @@ function DayMoodLine({ logs }: { logs: LogEntry[] }) {
         d: `M ${p.x} ${p.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${next.x} ${next.y}`,
         from: p.quadrant,
         to: next.quadrant,
+        fromX: p.x,
+        fromY: p.y,
+        toX: next.x,
+        toY: next.y,
       });
     }
   }
+
+  // useId scopes gradient IDs to this DayMoodLine instance — avoids
+  // collisions if multiple charts ever mount on the same screen.
+  const gradId = useId().replace(/:/g, '');
 
   return (
     <svg
@@ -393,14 +416,31 @@ function DayMoodLine({ logs }: { logs: LogEntry[] }) {
         stroke="rgba(34, 34, 34, 0.35)"
         strokeWidth={1}
       />
-      {/* Line segments, each colored by its destination quadrant for a soft
-          color-shift along the curve. */}
+      {/* One linearGradient per segment, running in user-space coords
+          from the source point to the destination point — colors flow
+          smoothly along each leg of the curve. */}
+      <defs>
+        {segments.map((s, i) => (
+          <linearGradient
+            key={i}
+            id={`mood-${gradId}-${i}`}
+            gradientUnits="userSpaceOnUse"
+            x1={s.fromX}
+            y1={s.fromY}
+            x2={s.toX}
+            y2={s.toY}
+          >
+            <stop offset="0%" stopColor={quadrantColor(s.from, 0.95)} />
+            <stop offset="100%" stopColor={quadrantColor(s.to, 0.95)} />
+          </linearGradient>
+        ))}
+      </defs>
       {segments.map((s, i) => (
         <path
           key={i}
           d={s.d}
           fill="none"
-          stroke={quadrantColor(s.to, 0.95)}
+          stroke={`url(#mood-${gradId}-${i})`}
           strokeWidth={3}
           strokeLinecap="round"
           strokeLinejoin="round"
