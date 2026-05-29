@@ -3,8 +3,6 @@ import { Plus, CalendarBlank } from '@phosphor-icons/react';
 import WeekMoodCard from '../components/WeekMoodCard';
 import { TODAY, TODAY_KEY, type LogEntry } from '../data/mockLogs';
 
-const USER_NAME = 'Rohan';
-
 function greetingFor(hour: number): string {
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
@@ -13,12 +11,23 @@ function greetingFor(hour: number): string {
 
 interface Props {
   logs: LogEntry[];
+  /** From the signed-in profile when Supabase is on; falls back to
+   *  'Rohan' for the mock/dev experience so the screen still looks
+   *  populated without an auth session. */
+  displayName?: string | null;
   onLog: () => void;
   onViewLogs: () => void;
   onOpenLog?: (id: string) => void;
 }
 
-export default function HomeScreen({ logs, onLog, onViewLogs, onOpenLog }: Props) {
+export default function HomeScreen({
+  logs,
+  displayName,
+  onLog,
+  onViewLogs,
+  onOpenLog,
+}: Props) {
+  const name = displayName?.trim() || 'Rohan';
   const [selectedKey, setSelectedKey] = useState(TODAY_KEY);
 
   return (
@@ -29,7 +38,7 @@ export default function HomeScreen({ logs, onLog, onViewLogs, onOpenLog }: Props
           <h1 className="greeting">
             {greetingFor(TODAY.getHours())},
             <br />
-            <em>{USER_NAME}.</em>
+            <em>{name}.</em>
           </h1>
 
           <div className="fab-zone">

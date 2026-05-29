@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react';
 import BlobField from './components/BlobField';
 import GrainOverlay from './components/GrainOverlay';
@@ -16,6 +16,12 @@ import { ALL_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs
 import type { Detected } from './lib/emotionDetect';
 import type { EmotionSelection, Quadrant } from './theme/emotions';
 import { useAuth } from './lib/useAuth';
+import {
+  supabase,
+  fetchLogs,
+  insertLog,
+  dbLogToLogEntry,
+} from './lib/supabase';
 
 type Screen =
   | 'home'
@@ -57,7 +63,31 @@ export default function App() {
     auth.state.status === 'needs-profile';
 
   const [screen, setScreen] = useState<Screen>('home');
-  const [logs, setLogs] = useState<LogEntry[]>(ALL_LOGS);
+  // Initial logs state: ALL_LOGS in mock/dev mode (no Supabase env vars
+  // → fully offline preview), empty when Supabase is wired (real data
+  // arrives via fetchLogs once the user authenticates).
+  const [logs, setLogs] = useState<LogEntry[]>(() =>
+    supabase ? [] : ALL_LOGS,
+  );
+
+  // When the user authenticates (or arrives already authenticated),
+  // pull their real logs from Supabase. RLS guarantees we only get
+  // rows they own. New accounts come back with [] → clean slate.
+  useEffect(() => {
+    if (auth.state.status !== 'authenticated') return;
+    let cancelled = false;
+    fetchLogs()
+      .then((dbLogs) => {
+        if (cancelled) return;
+        setLogs(dbLogs.map(dbLogToLogEntry));
+      })
+      .catch((err) => {
+        console.error('[tenor] fetchLogs failed', err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [auth.state.status]);
 
   // Log-detail screen state — id of the log being viewed + where to return
   // to when the user hits ×.
@@ -69,12 +99,33 @@ export default function App() {
   const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
   const [emotionContext, setEmotionContext] = useState('');
 
-  function submitVoiceLog(chips: Detected[], transcript: string) {
+  async function submitVoiceLog(chips: Detected[], transcript: string) {
     const now = new Date();
     const time = formatClock(now);
     const quadrants = Array.from(
       new Set(chips.map((c) => c.quadrant).filter((q): q is Quadrant => q !== null)),
     );
+
+    // Authenticated → write through Supabase, then mirror into local state
+    // so the home week card refreshes immediately.
+    if (auth.state.status === 'authenticated') {
+      try {
+        const result = await insertLog({
+          mode: 'speak',
+          dateKey: TODAY_KEY,
+          body: transcript,
+          chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+        });
+        const entry = dbLogToLogEntry(result);
+        setLogs((prev) => [...prev, entry]);
+        openLogDetail(entry.id, 'post-log');
+        return;
+      } catch (err) {
+        console.error('[tenor] insertLog (voice) failed', err);
+        // Fall through to local-only entry so the user isn't blocked.
+      }
+    }
+
     const entry: LogEntry = {
       id: `v${Date.now()}`,
       dateKey: TODAY_KEY,
@@ -110,11 +161,33 @@ export default function App() {
     setEmotionSelected((prev) => prev.filter((s) => s.name !== name));
   }
 
-  function submitEmotionLog() {
+  async function submitEmotionLog() {
     if (emotionSelected.length === 0) return;
     const now = new Date();
     const time = formatClock(now);
     const quadrants = Array.from(new Set(emotionSelected.map((s) => s.quadrant)));
+
+    if (auth.state.status === 'authenticated') {
+      try {
+        const result = await insertLog({
+          mode: 'select',
+          dateKey: TODAY_KEY,
+          body: emotionContext.trim() || null,
+          chips: emotionSelected.map((s) => ({
+            text: s.name,
+            quadrant: s.quadrant,
+          })),
+        });
+        const entry = dbLogToLogEntry(result);
+        setLogs((prev) => [...prev, entry]);
+        openLogDetail(entry.id, 'post-log');
+        return;
+      } catch (err) {
+        console.error('[tenor] insertLog (emotion) failed', err);
+        // Fall through to local-only entry so the user isn't blocked.
+      }
+    }
+
     const entry: LogEntry = {
       id: `e${Date.now()}`,
       dateKey: TODAY_KEY,
@@ -201,6 +274,11 @@ export default function App() {
       {screen === 'home' && (
         <HomeScreen
           logs={logs}
+          displayName={
+            auth.state.status === 'authenticated'
+              ? auth.state.profile.display_name
+              : undefined
+          }
           onLog={() => setScreen('logMethod')}
           onViewLogs={() => setScreen('logs')}
           onOpenLog={(id) => openLogDetail(id, 'home')}

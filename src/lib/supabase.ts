@@ -21,6 +21,7 @@
 // =====================================================================
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { formatClock, type LogEntry } from '../data/mockLogs';
 import type { Quadrant } from '../theme/emotions';
 
 // ----- Env wiring --------------------------------------------------------
@@ -305,4 +306,28 @@ export async function softDeleteLog(logId: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', logId);
   if (error) throw error;
+}
+
+/** DB row → in-app LogEntry shape. Single point of conversion so the
+ *  rest of the app's screens stay agnostic about Supabase. */
+export function dbLogToLogEntry(db: LogWithChips): LogEntry {
+  const loggedAt = new Date(db.logged_at);
+  const quadrants = Array.from(
+    new Set(
+      db.chips
+        .map((c) => c.quadrant)
+        .filter((q): q is Quadrant => q !== null),
+    ),
+  );
+  return {
+    id: db.id,
+    dateKey: db.date_key,
+    time: formatClock(loggedAt),
+    ts: loggedAt.getTime(),
+    mode: db.mode,
+    keywords: db.chips.map((c) => c.text),
+    quadrants,
+    body: db.body ?? undefined,
+    chips: db.chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+  };
 }
