@@ -1,4 +1,5 @@
-import { Check, X } from '@phosphor-icons/react';
+import { useState } from 'react';
+import { Check, CircleNotch, X } from '@phosphor-icons/react';
 import BackButton from '../components/BackButton';
 import {
   quadrantColor,
@@ -11,7 +12,9 @@ interface Props {
   onContextChange: (value: string) => void;
   onRemove: (name: string) => void;
   onBack: () => void;
-  onSubmit: () => void;
+  /** Returns a promise so the screen can hold a "processing" state
+   *  for the network-bound insert and ignore extra taps in flight. */
+  onSubmit: () => void | Promise<void>;
 }
 
 export default function EmotionReviewScreen({
@@ -22,6 +25,7 @@ export default function EmotionReviewScreen({
   onBack,
   onSubmit,
 }: Props) {
+  const [submitting, setSubmitting] = useState(false);
   return (
     <div className="screen" id="emotion-review">
       <div className="top-bar">
@@ -69,12 +73,28 @@ export default function EmotionReviewScreen({
 
         <button
           type="button"
-          className="er-submit"
-          aria-label="Log these emotions"
-          disabled={selected.length === 0}
-          onClick={onSubmit}
+          className={'er-submit' + (submitting ? ' er-submit--busy' : '')}
+          aria-label={submitting ? 'Saving log…' : 'Log these emotions'}
+          aria-busy={submitting}
+          disabled={submitting || selected.length === 0}
+          onClick={async () => {
+            if (submitting) return;
+            setSubmitting(true);
+            try {
+              await onSubmit();
+              // On success the parent navigates away → component
+              // unmounts and the busy state goes with it.
+            } catch (err) {
+              console.error('[tenor] emotion submit failed', err);
+              setSubmitting(false);
+            }
+          }}
         >
-          <Check size={22} weight="bold" />
+          {submitting ? (
+            <CircleNotch size={22} weight="bold" className="spin" />
+          ) : (
+            <Check size={22} weight="bold" />
+          )}
         </button>
       </div>
     </div>

@@ -1672,6 +1672,28 @@ button {
   background: rgba(34, 34, 34, 0.25);
   cursor: default;
 }
+/* Holds the submit button at a comfortable charcoal (not the fully
+   "disabled" grey) while the insert is in flight — same visual
+   weight as the idle state so the user can still see it. */
+.er-submit--busy:disabled,
+.round-btn--busy:disabled {
+  background: var(--charcoal);
+  opacity: 0.7;
+  cursor: progress;
+}
+
+/* Reusable rotation for CircleNotch spinners. Honors reduced-motion
+   preferences (just stays still — still legible as a loader icon). */
+@keyframes tenor-spin {
+  to { transform: rotate(360deg); }
+}
+.spin {
+  animation: tenor-spin 0.9s linear infinite;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+}
 
 /* ════════════════════════════════════════════
    Logs screen (D / W / M / Y views)

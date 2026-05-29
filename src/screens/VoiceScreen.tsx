@@ -3,6 +3,7 @@ import {
   Microphone,
   Square,
   Check,
+  CircleNotch,
   ArrowCounterClockwise,
   Plus,
   X,
@@ -26,7 +27,10 @@ const DEMO_SCRIPT =
 interface Props {
   demo: boolean;
   onBack: () => void;
-  onConfirm: (chips: Detected[], transcript: string) => void;
+  /** Returns a promise so the screen can show a "processing" state
+   *  for the (potentially network-bound) insert and refuse extra
+   *  taps while it resolves. */
+  onConfirm: (chips: Detected[], transcript: string) => void | Promise<void>;
 }
 
 function chipStyle(q: Detected['quadrant']) {
@@ -47,6 +51,10 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
   const [chips, setChips] = useState<Detected[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [demoActive, setDemoActive] = useState(false);
+  // True while the confirm-submit handler's promise is in flight.
+  // Disables the ✓ button + swaps the icon for a spinner so users
+  // can see something's happening (and can't double-tap).
+  const [submitting, setSubmitting] = useState(false);
   const demoTimer = useRef<number | null>(null);
 
   // Keep the latest transcript reachable from timers/handlers.
@@ -287,17 +295,39 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
             </button>
             <button
               type="button"
-              className="round-btn round-btn--confirm"
-              aria-label="Confirm and add to log"
-              disabled={chips.filter((c) => c.text.trim()).length === 0}
-              onClick={() =>
-                onConfirm(
-                  chips.filter((c) => c.text.trim()),
-                  transcriptRef.current.trim(),
-                )
+              className={
+                'round-btn round-btn--confirm' +
+                (submitting ? ' round-btn--busy' : '')
               }
+              aria-label={
+                submitting ? 'Saving log…' : 'Confirm and add to log'
+              }
+              aria-busy={submitting}
+              disabled={
+                submitting ||
+                chips.filter((c) => c.text.trim()).length === 0
+              }
+              onClick={async () => {
+                if (submitting) return;
+                setSubmitting(true);
+                try {
+                  await onConfirm(
+                    chips.filter((c) => c.text.trim()),
+                    transcriptRef.current.trim(),
+                  );
+                  // On success the parent navigates away → component
+                  // unmounts and the busy state goes with it.
+                } catch (err) {
+                  console.error('[tenor] voice confirm failed', err);
+                  setSubmitting(false);
+                }
+              }}
             >
-              <Check size={24} weight="bold" />
+              {submitting ? (
+                <CircleNotch size={24} weight="bold" className="spin" />
+              ) : (
+                <Check size={24} weight="bold" />
+              )}
             </button>
           </div>
         </div>

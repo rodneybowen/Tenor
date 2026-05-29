@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft } from '@phosphor-icons/react';
 import BlobField from './components/BlobField';
 import GrainOverlay from './components/GrainOverlay';
@@ -94,12 +94,26 @@ export default function App() {
   const [viewingLogId, setViewingLogId] = useState<string | null>(null);
   const [detailOrigin, setDetailOrigin] = useState<DetailOrigin>('home');
 
+  // Submission guard — second-line defense against the duplicate-log
+  // bug: if a rapid second tap leaks past the screen's disabled UI,
+  // the in-flight insert simply early-returns instead of double-writing.
+  const submittingRef = useRef(false);
+
   // Emotion-selector flow state
   const [entryQuadrant, setEntryQuadrant] = useState<Quadrant>('hep');
   const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
   const [emotionContext, setEmotionContext] = useState('');
 
   async function submitVoiceLog(chips: Detected[], transcript: string) {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await submitVoiceLogInner(chips, transcript);
+    } finally {
+      submittingRef.current = false;
+    }
+  }
+  async function submitVoiceLogInner(chips: Detected[], transcript: string) {
     const now = new Date();
     const time = formatClock(now);
     const quadrants = Array.from(
@@ -162,6 +176,15 @@ export default function App() {
   }
 
   async function submitEmotionLog() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      await submitEmotionLogInner();
+    } finally {
+      submittingRef.current = false;
+    }
+  }
+  async function submitEmotionLogInner() {
     if (emotionSelected.length === 0) return;
     const now = new Date();
     const time = formatClock(now);
