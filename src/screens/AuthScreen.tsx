@@ -66,7 +66,7 @@ export default function AuthScreen() {
     return (
       <div className="screen" id="auth">
         <div className="auth-shell">
-          <div className="auth-wordmark">TENOR</div>
+          <h1 className="auth-wordmark">Tenor</h1>
           <div className="auth-card">
             <h2 className="auth-card__title">Check your email</h2>
             <p className="auth-card__sub">
@@ -92,7 +92,7 @@ export default function AuthScreen() {
   return (
     <div className="screen" id="auth">
       <div className="auth-shell">
-        <div className="auth-wordmark">TENOR</div>
+        <h1 className="auth-wordmark">Tenor</h1>
 
         <div className="auth-card">
           <div className="auth-tabs" role="tablist">

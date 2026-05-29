@@ -49,7 +49,7 @@ export default function ProfileSetupScreen({ userId, email, onComplete }: Props)
   return (
     <div className="screen" id="auth">
       <div className="auth-shell">
-        <div className="auth-wordmark">TENOR</div>
+        <h1 className="auth-wordmark">Tenor</h1>
 
         <div className="auth-card">
           <h2 className="auth-card__title">Welcome to Tenor</h2>

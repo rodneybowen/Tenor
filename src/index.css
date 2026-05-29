@@ -2022,16 +2022,17 @@ button {
   scrollbar-width: none;
 }
 .auth-shell::-webkit-scrollbar { display: none; }
+/* H1 per the design system — Merriweather Regular 36px. Lives on the
+   auth screens only (the main app suppresses the wordmark entirely
+   because the home greeting carries brand presence on its own). */
 .auth-wordmark {
   font-family: var(--font-serif);
-  font-size: 12px;
-  font-weight: 300;
-  letter-spacing: 0.5em;
+  font-size: 36px;
+  font-weight: 400;
+  line-height: 1;
   color: var(--charcoal);
-  opacity: 0.32;
-  text-transform: uppercase;
-  margin-bottom: 32px;
-  padding-left: 0.5em; /* visually center despite trailing letter-spacing */
+  margin: 8px 0 28px;
+  text-align: center;
 }
 .auth-card {
   width: 100%;
@@ -2198,6 +2199,9 @@ button {
 }
 .auth-google {
   width: 100%;
+  /* Stronger stroke than the generic btn-secondary border — needed so
+     the button reads against the (also-white) auth card background. */
+  border: 1.5px solid rgba(34, 34, 34, 0.22);
 }
 .auth-google:disabled {
   opacity: 0.6;
