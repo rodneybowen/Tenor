@@ -408,14 +408,13 @@ button {
   letter-spacing: 0.02em;
 }
 
-/* Log entries list for the selected day */
+/* Log entries list for the selected day. Grows naturally — the
+   week-card stretches around the list so the user never has to
+   scroll inside a cropped subregion. */
 .log-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-height: 296px;
-  overflow-y: auto;
-  scrollbar-width: none;
   margin: 0 -4px;
   padding: 0 4px;
 }
@@ -1994,6 +1993,12 @@ button {
   }
 }
 .logs-view-anim {
+  /* Flex-column with a generous gap separates the Day view's log
+     list from its "Your day's mood" line graph. No-op for the
+     single-child W / M / Y bodies. */
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
   animation: logs-view-fade-in 0.32s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {
