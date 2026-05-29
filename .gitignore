@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment variables — Supabase URL + anon key live here.
+# Never commit a real .env; .env.example holds the template only.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

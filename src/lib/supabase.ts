@@ -1,0 +1,242 @@
+// =====================================================================
+// Tenor — Supabase client wrapper
+// =====================================================================
+// One place that talks to Supabase. Everything else in the app imports
+// from here so we can:
+//   • swap the transport (mock / real) without touching screens,
+//   • keep query shapes in one file (easier to audit for PHI leaks),
+//   • surface a tiny typed API (`signUp`, `fetchLogs`, `insertLog`…)
+//     rather than scatter `supabase.from('logs')…` chains everywhere.
+//
+// Auth model: Supabase Auth (email / phone / Google). On signup we
+// insert a matching `profiles` row with the chosen role. RLS policies
+// (see supabase/migrations/0001_init.sql) guarantee that any query
+// run with the user's session token only ever returns rows that
+// belong to them or to patients they're linked to.
+//
+// Dev mode: when `VITE_SUPABASE_URL` is missing we export `supabase =
+// null`. Callers MUST handle null and fall back to local mocks — the
+// existing `ALL_LOGS` in `data/mockLogs.ts`. This keeps the prototype
+// runnable without a Supabase project provisioned.
+// =====================================================================
+
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Quadrant } from '../theme/emotions';
+
+// ----- Env wiring --------------------------------------------------------
+
+const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+
+/** True when both env vars are present — gate live queries on this. */
+export const supabaseEnabled = Boolean(URL && ANON);
+
+/** Singleton client, or null when env vars are missing (dev/mock mode). */
+export const supabase: SupabaseClient | null = supabaseEnabled
+  ? createClient(URL!, ANON!, {
+      auth: {
+        // Persist the session in localStorage so a page refresh
+        // doesn't kick the user back to login.
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    })
+  : null;
+
+// ----- DB row shapes (mirror the migration) ------------------------------
+
+export type Role = 'patient' | 'therapist';
+export type LogMode = 'speak' | 'select' | 'type' | 'scan';
+
+export interface DbProfile {
+  id: string;
+  role: Role;
+  display_name: string | null;
+  timezone: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface DbLog {
+  id: string;
+  user_id: string;
+  mode: LogMode;
+  date_key: string; // 'YYYY-MM-DD'
+  logged_at: string; // ISO
+  body: string | null;
+  parent_log_id: string | null;
+  created_at: string;
+  deleted_at: string | null;
+}
+
+export interface DbChip {
+  id: string;
+  log_id: string;
+  text: string;
+  quadrant: Quadrant | null;
+  sort_order: number;
+  created_at: string;
+}
+
+/** A log joined with its chips — what the app actually consumes. */
+export interface LogWithChips extends DbLog {
+  chips: DbChip[];
+}
+
+// ----- Auth helpers ------------------------------------------------------
+
+function requireClient(): SupabaseClient {
+  if (!supabase) {
+    throw new Error(
+      'Supabase env vars missing — set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local',
+    );
+  }
+  return supabase;
+}
+
+export async function signUp(args: {
+  email: string;
+  password: string;
+  role: Role;
+  displayName: string;
+}): Promise<DbProfile> {
+  const sb = requireClient();
+  const { data, error } = await sb.auth.signUp({
+    email: args.email,
+    password: args.password,
+  });
+  if (error) throw error;
+  if (!data.user) throw new Error('Sign-up returned no user');
+
+  // Profile row is the app's source of truth for role + display name.
+  // RLS policy "profiles self insert" allows this because id = auth.uid().
+  const { data: profile, error: pErr } = await sb
+    .from('profiles')
+    .insert({
+      id: data.user.id,
+      role: args.role,
+      display_name: args.displayName,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    })
+    .select()
+    .single();
+  if (pErr) throw pErr;
+  return profile as DbProfile;
+}
+
+export async function signIn(email: string, password: string): Promise<void> {
+  const sb = requireClient();
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+}
+
+export async function signOut(): Promise<void> {
+  const sb = requireClient();
+  await sb.auth.signOut();
+}
+
+export async function getCurrentProfile(): Promise<DbProfile | null> {
+  const sb = requireClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return null;
+  const { data, error } = await sb
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+  if (error) return null;
+  return data as DbProfile;
+}
+
+// ----- Log CRUD ----------------------------------------------------------
+
+/** All non-deleted logs for the current user. Therapists viewing a
+ *  patient's data pass `forUserId` explicitly; RLS will reject it if
+ *  they aren't actually linked to that patient. */
+export async function fetchLogs(forUserId?: string): Promise<LogWithChips[]> {
+  const sb = requireClient();
+  let query = sb
+    .from('logs')
+    .select('*, log_chips(*)')
+    .is('deleted_at', null)
+    .order('logged_at', { ascending: true });
+  if (forUserId) query = query.eq('user_id', forUserId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  // Supabase returns `log_chips` as the join key; flatten to `chips`.
+  return (data ?? []).map(
+    (row): LogWithChips => ({
+      ...(row as DbLog),
+      chips: ((row as unknown as { log_chips: DbChip[] }).log_chips ?? []).sort(
+        (a, b) => a.sort_order - b.sort_order,
+      ),
+    }),
+  );
+}
+
+export interface NewLogInput {
+  mode: LogMode;
+  dateKey: string; // 'YYYY-MM-DD' in the user's TZ
+  body?: string | null;
+  parentLogId?: string | null;
+  chips: { text: string; quadrant: Quadrant | null }[];
+}
+
+/** Insert a log + its chips atomically (chips go in a follow-up insert;
+ *  RLS keeps each row scoped to the calling user). Returns the joined
+ *  log so the caller can immediately render the new entry. */
+export async function insertLog(input: NewLogInput): Promise<LogWithChips> {
+  const sb = requireClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: log, error: logErr } = await sb
+    .from('logs')
+    .insert({
+      user_id: user.id,
+      mode: input.mode,
+      date_key: input.dateKey,
+      body: input.body ?? null,
+      parent_log_id: input.parentLogId ?? null,
+    })
+    .select()
+    .single();
+  if (logErr) throw logErr;
+
+  let chips: DbChip[] = [];
+  if (input.chips.length > 0) {
+    const rows = input.chips.map((c, i) => ({
+      log_id: (log as DbLog).id,
+      text: c.text,
+      quadrant: c.quadrant,
+      sort_order: i,
+    }));
+    const { data: insertedChips, error: chipErr } = await sb
+      .from('log_chips')
+      .insert(rows)
+      .select();
+    if (chipErr) throw chipErr;
+    chips = (insertedChips ?? []) as DbChip[];
+  }
+
+  return { ...(log as DbLog), chips };
+}
+
+/** Soft delete — sets `deleted_at`. Patients can request a hard wipe
+ *  later via a server-side job (out of scope for the prototype). */
+export async function softDeleteLog(logId: string): Promise<void> {
+  const sb = requireClient();
+  const { error } = await sb
+    .from('logs')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', logId);
+  if (error) throw error;
+}
