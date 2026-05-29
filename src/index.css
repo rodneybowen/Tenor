@@ -2000,3 +2000,234 @@ button {
   .breakdown__bubble { animation: none; }
   .logs-view-anim { animation: none; }
 }
+
+/* ════════════════════════════════════════════
+   Auth screen (Sign in / Sign up / Profile setup)
+   ════════════════════════════════════════════ */
+#auth {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.auth-shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: calc(var(--fade-top-end) + 24px) 24px 24px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.auth-shell::-webkit-scrollbar { display: none; }
+.auth-wordmark {
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  color: var(--charcoal);
+  opacity: 0.32;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+  padding-left: 0.5em; /* visually center despite trailing letter-spacing */
+}
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(34, 34, 34, 0.08),
+              0 2px 8px rgba(34, 34, 34, 0.04);
+  padding: 24px 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.auth-card__title {
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 400;
+  color: var(--charcoal);
+  text-align: center;
+  margin: 4px 0 0;
+}
+.auth-card__sub {
+  text-align: center;
+  font-size: 14px;
+  color: var(--charcoal);
+  opacity: 0.65;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* ── Sign in / Sign up tabs ───────────────── */
+.auth-tabs {
+  display: flex;
+  background: rgba(34, 34, 34, 0.05);
+  border-radius: var(--r-pill);
+  padding: 4px;
+  gap: 4px;
+}
+.auth-tabs__tab {
+  flex: 1;
+  height: 36px;
+  border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--charcoal);
+  opacity: 0.55;
+  background: transparent;
+  transition: background 0.18s, opacity 0.18s;
+}
+.auth-tabs__tab--on {
+  background: #ffffff;
+  opacity: 1;
+  box-shadow: 0 1px 3px rgba(34, 34, 34, 0.08);
+}
+
+/* ── Form fields ──────────────────────────── */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.auth-field__label {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  opacity: 0.65;
+  text-transform: uppercase;
+}
+.auth-field input {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  color: var(--charcoal);
+  background: #ffffff;
+  border: 1px solid rgba(34, 34, 34, 0.1);
+  border-radius: 14px;
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.auth-field input::placeholder {
+  color: var(--charcoal);
+  opacity: 0.35;
+}
+.auth-field input:focus {
+  border-color: rgba(34, 34, 34, 0.3);
+  box-shadow: 0 0 0 4px rgba(34, 34, 34, 0.06);
+}
+
+/* ── Role selector (Patient / Therapist) ───── */
+.auth-role {
+  display: flex;
+  background: rgba(34, 34, 34, 0.05);
+  border-radius: 14px;
+  padding: 4px;
+  gap: 4px;
+}
+.auth-role__opt {
+  flex: 1;
+  height: 40px;
+  border-radius: 10px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--charcoal);
+  opacity: 0.6;
+  background: transparent;
+  transition: background 0.18s, opacity 0.18s;
+}
+.auth-role__opt--on {
+  background: #ffffff;
+  opacity: 1;
+  box-shadow: 0 1px 3px rgba(34, 34, 34, 0.08);
+}
+
+/* ── Inline error ─────────────────────────── */
+.auth-error {
+  margin: 0;
+  padding: 10px 12px;
+  background: rgba(237, 22, 21, 0.08);  /* Coral red 600 @ low alpha */
+  border: 1px solid rgba(237, 22, 21, 0.2);
+  border-radius: 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: #881514;  /* Coral red 900 — readable contrast */
+  line-height: 1.4;
+}
+
+/* ── Submit + Google buttons ─────────────── */
+.auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--charcoal);
+  opacity: 0.4;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 4px 0;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(34, 34, 34, 0.1);
+}
+.auth-google {
+  width: 100%;
+}
+.auth-google:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ── HIPAA reassurance footer ─────────────── */
+.auth-hipaa {
+  margin: 4px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 300;
+  color: var(--charcoal);
+  opacity: 0.55;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* ── Tertiary text link (cancel/sign out) ─── */
+.auth-link {
+  background: transparent;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--charcoal);
+  opacity: 0.55;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 6px;
+}
+.auth-link:hover { opacity: 0.85; }
+.auth-link:disabled { opacity: 0.3; cursor: default; }

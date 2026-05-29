@@ -101,7 +101,7 @@ export async function signUp(args: {
   password: string;
   role: Role;
   displayName: string;
-}): Promise<DbProfile> {
+}): Promise<DbProfile | null> {
   const sb = requireClient();
   const { data, error } = await sb.auth.signUp({
     email: args.email,
@@ -110,26 +110,92 @@ export async function signUp(args: {
   if (error) throw error;
   if (!data.user) throw new Error('Sign-up returned no user');
 
-  // Profile row is the app's source of truth for role + display name.
-  // RLS policy "profiles self insert" allows this because id = auth.uid().
-  const { data: profile, error: pErr } = await sb
-    .from('profiles')
-    .insert({
-      id: data.user.id,
-      role: args.role,
-      display_name: args.displayName,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    })
-    .select()
-    .single();
-  if (pErr) throw pErr;
-  return profile as DbProfile;
+  // If the Supabase project has email confirmation enabled, signUp
+  // returns the user but no active session — RLS would reject the
+  // profile insert (no auth.uid()). Stash role + name in localStorage
+  // so ProfileSetupScreen can pre-fill them after the user confirms.
+  if (!data.session) {
+    try {
+      localStorage.setItem(
+        'tenor:pending-profile',
+        JSON.stringify({ role: args.role, displayName: args.displayName }),
+      );
+    } catch {
+      /* localStorage unavailable — user will re-enter on first sign-in */
+    }
+    return null;
+  }
+
+  // Active session: safe to insert the profile now.
+  return createProfile({
+    userId: data.user.id,
+    role: args.role,
+    displayName: args.displayName,
+  });
+}
+
+/** Pop the stash from a signUp that needed email confirmation. Used by
+ *  ProfileSetupScreen on first sign-in to pre-fill the form. */
+export function takePendingProfile(): {
+  role: Role;
+  displayName: string;
+} | null {
+  try {
+    const raw = localStorage.getItem('tenor:pending-profile');
+    if (!raw) return null;
+    localStorage.removeItem('tenor:pending-profile');
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 export async function signIn(email: string, password: string): Promise<void> {
   const sb = requireClient();
   const { error } = await sb.auth.signInWithPassword({ email, password });
   if (error) throw error;
+}
+
+/** Google OAuth — redirects to Google, then back to the current URL.
+ *  Session is picked up automatically (createClient has detectSessionInUrl).
+ *  After the redirect, the user may not yet have a `profiles` row — the
+ *  app routes them to ProfileSetupScreen until they finish signup. */
+export async function signInWithGoogle(): Promise<void> {
+  const sb = requireClient();
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      // Return to wherever the app is currently running. Works in dev
+      // (localhost:5175) and production (github.io/Tenor) without code
+      // changes — make sure both URLs are whitelisted in Supabase →
+      // Authentication → URL Configuration.
+      redirectTo: window.location.href,
+    },
+  });
+  if (error) throw error;
+}
+
+/** Insert the `profiles` row for a freshly-signed-up user. Used by
+ *  ProfileSetupScreen after Google OAuth, where Supabase auto-creates
+ *  the auth.users entry but we still need to capture role + name. */
+export async function createProfile(args: {
+  userId: string;
+  role: Role;
+  displayName: string;
+}): Promise<DbProfile> {
+  const sb = requireClient();
+  const { data, error } = await sb
+    .from('profiles')
+    .insert({
+      id: args.userId,
+      role: args.role,
+      display_name: args.displayName,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbProfile;
 }
 
 export async function signOut(): Promise<void> {

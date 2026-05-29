@@ -10,9 +10,12 @@ import EmotionGridScreen from './screens/EmotionGridScreen';
 import EmotionReviewScreen from './screens/EmotionReviewScreen';
 import LogDetailScreen from './screens/LogDetailScreen';
 import LogsScreen from './screens/LogsScreen';
+import AuthScreen from './screens/AuthScreen';
+import ProfileSetupScreen from './screens/ProfileSetupScreen';
 import { ALL_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
 import type { Detected } from './lib/emotionDetect';
 import type { EmotionSelection, Quadrant } from './theme/emotions';
+import { useAuth } from './lib/useAuth';
 
 type Screen =
   | 'home'
@@ -44,6 +47,15 @@ const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
 const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
 
 export default function App() {
+  // Auth gate. When Supabase env vars aren't set, useAuth returns
+  // 'disabled' and we render the full app on mocks — preserves the
+  // pre-Supabase dev experience exactly. When they ARE set we route
+  // through AuthScreen / ProfileSetupScreen until a profile exists.
+  const auth = useAuth();
+  const screenIsAuth =
+    auth.state.status === 'unauthenticated' ||
+    auth.state.status === 'needs-profile';
+
   const [screen, setScreen] = useState<Screen>('home');
   const [logs, setLogs] = useState<LogEntry[]>(ALL_LOGS);
 
@@ -149,6 +161,37 @@ export default function App() {
     screen === 'logs' ||
     screen === 'chat' ||
     screen === 'account';
+
+  // Render the auth flow before anything else when Supabase is on
+  // and the user isn't fully authenticated. AuthScreen/ProfileSetupScreen
+  // sit inside the same .app-root so the aurora backdrop is shared.
+  if (screenIsAuth) {
+    return (
+      <div className="app-root">
+        <BlobField />
+        <GrainOverlay />
+        {auth.state.status === 'unauthenticated' && <AuthScreen />}
+        {auth.state.status === 'needs-profile' && (
+          <ProfileSetupScreen
+            userId={auth.state.userId}
+            email={auth.state.email}
+            onComplete={() => auth.refresh()}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // 'loading' renders blank (just the aurora) — typical session check
+  // resolves in <100ms from localStorage, so this is barely visible.
+  if (auth.state.status === 'loading') {
+    return (
+      <div className="app-root">
+        <BlobField />
+        <GrainOverlay />
+      </div>
+    );
+  }
 
   return (
     <div className="app-root">
