@@ -77,9 +77,17 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
   const [anchor, setAnchor] = useState<Date>(() => periodStart('W', TODAY));
 
   function changeView(next: LogView) {
-    // Re-anchor to the equivalent period containing the current anchor.
     setView(next);
-    setAnchor(periodStart(next, anchor));
+    if (next === 'D') {
+      // Switching to Day → land on today, not the start of whatever
+      // period the user was browsing. Drill-down from a Week-bar /
+      // Month-cell still routes to that specific day via drillTo().
+      setAnchor(periodStart('D', TODAY));
+    } else {
+      // For W / M / Y keep the user's browsing context — re-anchor
+      // to the equivalent period containing the current anchor.
+      setAnchor(periodStart(next, anchor));
+    }
   }
   function go(dir: -1 | 1) {
     const candidate = shiftPeriod(view, anchor, dir);
