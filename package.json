@@ -6,10 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:ios": "CAPACITOR=1 npm run build && npx cap sync ios",
+    "ios:open": "npm run build:ios && npx cap open ios",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/browser": "^8.0.3",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.3.4",
     "@phosphor-icons/react": "^2.1.10",
     "@supabase/supabase-js": "^2.106.2",
     "react": "^19.2.6",

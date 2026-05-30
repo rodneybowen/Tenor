@@ -18,6 +18,16 @@ dist-ssr
 .env.*
 !.env.example
 
+# Capacitor iOS — Xcode artefacts that shouldn't be committed.
+# The ios/App/App project itself is fine to commit (Capacitor
+# regenerates it on `npx cap add ios`, but committing lets you
+# track Info.plist edits, app icons, etc.).
+ios/App/Pods
+ios/App/build
+ios/App/DerivedData
+ios/App/App/public
+ios/.DS_Store
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

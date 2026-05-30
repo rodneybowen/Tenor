@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { GoogleLogo } from '@phosphor-icons/react';
 import { signIn, signInWithGoogle, signUp, type Role } from '../lib/supabase';
+import { isNative, signInWithGoogleNative } from '../lib/nativeAuth';
 
 type Mode = 'signin' | 'signup';
 
@@ -52,10 +53,18 @@ export default function AuthScreen() {
     setError(null);
     setBusy(true);
     try {
-      await signInWithGoogle();
-      // OAuth redirects away — no further code runs here. After Google
-      // bounces back, detectSessionInUrl picks up the session and
-      // useAuth re-evaluates.
+      if (isNative) {
+        // Native iOS path: opens Safari View, waits for tenor://
+        // callback, exchanges the code for a session. After this
+        // resolves we're authenticated — useAuth picks it up.
+        await signInWithGoogleNative();
+        setBusy(false);
+      } else {
+        // Web path: window.location redirect. No further code runs
+        // here — after Google bounces back, detectSessionInUrl picks
+        // up the session and useAuth re-evaluates.
+        await signInWithGoogle();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);

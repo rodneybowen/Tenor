@@ -19,6 +19,7 @@ import {
   type Quadrant,
 } from '../theme/emotions';
 import { useVocabulary, type Emotion, type VocabByCategory } from '../lib/vocabulary';
+import * as haptics from '../lib/haptics';
 
 interface Props {
   entryQuadrant: Quadrant;
@@ -123,14 +124,6 @@ const FISHEYE_RADIUS = 240;
 const SCALE_CEIL = 1.08;
 const SCALE_FLOOR = 0.6;
 const OPACITY_FLOOR = 0.42;
-
-/** Web Vibration API — real haptic on Android browsers, a no-op
- *  on iOS Safari (Apple doesn't ship it) and desktop browsers. */
-function haptic(ms: number) {
-  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-    navigator.vibrate(ms);
-  }
-}
 
 export default function EmotionGridScreen({
   entryQuadrant,
@@ -294,7 +287,7 @@ export default function EmotionGridScreen({
         const d = Math.hypot(p.cx - vcx, p.cy - vcy);
         if (d < nearest) nearest = d;
       }
-      if (nearest < 14) haptic(8);
+      if (nearest < 14) haptics.snap();
     }
     vp.addEventListener('scroll', onScroll, { passive: true });
     vp.addEventListener('scrollend', onScrollEnd);
@@ -371,7 +364,8 @@ export default function EmotionGridScreen({
                 aria-pressed={isSelected}
                 disabled={disabled}
                 onClick={() => {
-                  haptic(isSelected ? 6 : 12);
+                  if (isSelected) haptics.softTap();
+                  else haptics.tap();
                   onToggle({ name: p.name, quadrant: p.quadrant });
                 }}
               >
