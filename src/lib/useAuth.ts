@@ -18,6 +18,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase, type DbProfile, getCurrentProfile } from './supabase';
+import { initNativeAuthCallback } from './nativeAuth';
 
 export type AuthState =
   | { status: 'loading' }
@@ -74,7 +75,14 @@ export function useAuth(): AuthHook {
       check();
     });
 
-    return () => subscription.unsubscribe();
+    // On native iOS, listen for the tenor:// callback from system Safari
+    // after Google OAuth and exchange the PKCE code for a session.
+    const cleanupNative = initNativeAuthCallback(() => check());
+
+    return () => {
+      subscription.unsubscribe();
+      cleanupNative();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

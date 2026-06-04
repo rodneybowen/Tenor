@@ -72,14 +72,6 @@ interface ChipPos {
   cy: number;
 }
 
-/** Geometric center of a quadrant's chip grid — used for entry scroll-centering. */
-function quadrantCenter(q: Quadrant): { x: number; y: number } {
-  const d = QUAD_DIR[q];
-  const midX = QUAD_INNER + ((COLS - 1) * CELL) / 2;
-  const midY = QUAD_INNER + ((ROWS - 1) * CELL) / 2;
-  return { x: CENTER_X + d.sx * midX, y: CENTER_Y + d.sy * midY };
-}
-
 function buildPositions(vocab: VocabByCategory): ChipPos[] {
   const out: ChipPos[] = [];
   for (const q of Object.keys(QUAD_DIR) as Quadrant[]) {
@@ -255,13 +247,49 @@ export default function EmotionGridScreen({
   // quadrant changes. Deliberately NOT re-run when positions change
   // (e.g. live vocab loads) so the user's scroll position isn't
   // yanked back to centroid mid-explore.
+  // Prime the iOS Taptic Engine on mount so the very first scroll haptic
+  // isn't silent. Without this, the engine sleeps until the first chip
+  // tap wakes it, so initial drag-scroll feels dead.
+  useEffect(() => {
+    haptics.prime();
+  }, []);
+
+  // Track whether the user has interacted with the viewport. If they
+  // have, we never auto-recenter — even if positions change (e.g. the
+  // live vocab CSV loads after mount). If they haven't, we re-center
+  // on positions changes so the inner-corner chip lands correctly
+  // once the real vocab arrives (on web — iOS often uses the static
+  // fallback because CORS blocks the sheet fetch).
+  const userInteractedRef = useRef(false);
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
-    const c = quadrantCenter(entryQuadrant);
-    vp.scrollLeft = c.x - vp.clientWidth / 2;
-    vp.scrollTop = c.y - vp.clientHeight / 2;
-  }, [entryQuadrant]);
+    function markInteracted() {
+      userInteractedRef.current = true;
+    }
+    vp.addEventListener('pointerdown', markInteracted, { once: true });
+    vp.addEventListener('wheel', markInteracted, { once: true, passive: true });
+    vp.addEventListener('touchstart', markInteracted, { once: true, passive: true });
+    return () => {
+      vp.removeEventListener('pointerdown', markInteracted);
+      vp.removeEventListener('wheel', markInteracted);
+      vp.removeEventListener('touchstart', markInteracted);
+    };
+  }, []);
+
+  useEffect(() => {
+    const vp = viewportRef.current;
+    if (!vp) return;
+    if (userInteractedRef.current) return; // don't yank mid-explore
+    // Center on the INNER-corner chip of the picked quadrant — the one
+    // closest to the plane's center seam (e.g. HEP → "Alert", HEN →
+    // "Annoyed"). This signals that other quadrants are reachable by
+    // panning outward.
+    const corner = positions.find((p) => p.quadrant === entryQuadrant);
+    if (!corner) return;
+    vp.scrollLeft = corner.cx - vp.clientWidth / 2;
+    vp.scrollTop = corner.cy - vp.clientHeight / 2;
+  }, [entryQuadrant, positions]);
 
   // Listeners + fisheye apply: also re-attaches when positions change
   // (live vocab → new chip set) so the listener closure stays fresh.
@@ -270,11 +298,36 @@ export default function EmotionGridScreen({
     if (!vp) return;
     applyFisheye();
 
+    // Velocity-based ticks while scrolling — like Apple Watch crown.
+    // Each tick fires when the centered chip changes; effectively the
+    // tick rate scales with scroll speed because faster scroll =
+    // more chips passing through center per second.
+    let lastCenteredKey: string | null = null;
     function onScroll() {
       if (rafRef.current !== null) return;
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null;
         applyFisheye();
+
+        const v = viewportRef.current;
+        if (!v) return;
+        const vcx = v.scrollLeft + v.clientWidth / 2;
+        const vcy = v.scrollTop + v.clientHeight / 2;
+        let nearestKey: string | null = null;
+        let nearestDist = Infinity;
+        for (const p of positions) {
+          const d = Math.hypot(p.cx - vcx, p.cy - vcy);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestKey = p.name;
+          }
+        }
+        // Only tick when the chip closest to center changes — that's
+        // the equivalent of one detent passing under the cursor.
+        if (nearestKey && nearestKey !== lastCenteredKey) {
+          lastCenteredKey = nearestKey;
+          haptics.snap();
+        }
       });
     }
     function onScrollEnd() {

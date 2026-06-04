@@ -73,6 +73,22 @@ export default function App() {
   // When the user authenticates (or arrives already authenticated),
   // pull their real logs from Supabase. RLS guarantees we only get
   // rows they own. New accounts come back with [] → clean slate.
+  // App-wide press haptic — fires `tap()` on any <button> click.
+  // Capacitor's Haptics plugin no-ops on web/desktop, so this is safe
+  // everywhere. Capture phase so it always runs even if a child stops
+  // propagation. Skipped for disabled buttons.
+  useEffect(() => {
+    function onPointerDown(e: Event) {
+      const t = e.target as HTMLElement | null;
+      if (!t) return;
+      const btn = t.closest('button') as HTMLButtonElement | null;
+      if (!btn || btn.disabled) return;
+      void import('./lib/haptics').then((h) => h.tap());
+    }
+    document.addEventListener('pointerdown', onPointerDown, true);
+    return () => document.removeEventListener('pointerdown', onPointerDown, true);
+  }, []);
+
   useEffect(() => {
     if (auth.state.status !== 'authenticated') return;
     let cancelled = false;

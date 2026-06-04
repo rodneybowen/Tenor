@@ -1,38 +1,16 @@
-// =====================================================================
-// Tenor — native (Capacitor) Google OAuth
-// =====================================================================
-// The web Google OAuth flow (window.location redirect) doesn't return
-// to a Capacitor app — iOS leaves it in Safari instead. This module
-// implements the native pattern:
-//
-//   1. Ask Supabase for the OAuth URL with `skipBrowserRedirect: true`.
-//   2. Open it in an in-app Safari View via Capacitor's Browser plugin.
-//   3. After Google auth, Supabase redirects to `tenor://auth-callback`.
-//      iOS recognises the URL scheme (declared in capacitor.config.ts +
-//      Info.plist) and re-activates the app with the URL.
-//   4. We listen for that via `App.addListener('appUrlOpen', …)`,
-//      extract the code, exchange it for a Supabase session, and close
-//      the in-app browser.
-//
-// REQUIRES (one-time):
-//   - Supabase → Auth → URL Configuration → Redirect URLs allowlist
-//     must include `tenor://auth-callback` (no trailing slash).
-//   - Xcode → Tenor target → Info → URL Types — add `tenor` scheme
-//     (Capacitor's `cap sync` writes this from capacitor.config.ts).
-// =====================================================================
-
 import { Capacitor } from '@capacitor/core';
 import { App as CapApp } from '@capacitor/app';
-import { Browser } from '@capacitor/browser';
 import { supabase } from './supabase';
 
 export const isNative = Capacitor.isNativePlatform();
 
 const REDIRECT_URL = 'tenor://auth-callback';
 
-/** Native Google sign-in. Throws if not on a Capacitor platform or if
- *  Supabase isn't configured. Caller (AuthScreen) should branch on
- *  `isNative` and fall back to the web `signInWithGoogle` otherwise. */
+/**
+ * Native Google sign-in — opens system Safari and returns immediately.
+ * The OAuth callback is handled globally by `initNativeAuthCallback()`
+ * in useAuth.ts, which exchanges the code and fires onAuthStateChange.
+ */
 export async function signInWithGoogleNative(): Promise<void> {
   if (!isNative) {
     throw new Error('signInWithGoogleNative called outside a native app');
@@ -41,9 +19,6 @@ export async function signInWithGoogleNative(): Promise<void> {
     throw new Error('Supabase env vars missing');
   }
 
-  // 1. Get the OAuth URL — Supabase normally redirects the window;
-  // skipBrowserRedirect keeps us in control so we can open it in
-  // Capacitor's in-app browser instead.
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: {
@@ -54,71 +29,54 @@ export async function signInWithGoogleNative(): Promise<void> {
   if (error) throw error;
   if (!data?.url) throw new Error('Supabase did not return an OAuth URL');
 
-  // 2. Open the OAuth URL in a Safari View (in-app browser).
-  await Browser.open({
-    url: data.url,
-    presentationStyle: 'popover',
-  });
+  // Open in system Safari. Google auth completes there, then iOS
+  // redirects to tenor:// which re-activates this app. The code
+  // exchange happens in the global appUrlOpen listener below.
+  window.open(data.url, '_system');
+}
 
-  // 3. Wait for the system to re-activate the app with `tenor://…`.
-  await new Promise<void>((resolve, reject) => {
-    let settled = false;
-    const finish = (action: () => Promise<void> | void) => {
-      if (settled) return;
-      settled = true;
-      void Promise.resolve(action())
-        .then(() => Browser.close().catch(() => undefined))
-        .then(() => resolve())
-        .catch(async (err) => {
-          await Browser.close().catch(() => undefined);
-          reject(err);
-        });
-    };
+/**
+ * Call once at app startup (from useAuth). Listens for the tenor://
+ * auth-callback URL that iOS delivers after Google OAuth completes
+ * in system Safari, exchanges the PKCE code for a Supabase session.
+ */
+export function initNativeAuthCallback(onSession: () => void): () => void {
+  if (!isNative || !supabase) return () => undefined;
 
-    const subPromise = CapApp.addListener('appUrlOpen', (event) => {
-      void (async () => {
-        try {
-          const url = event.url;
-          if (!url || !url.startsWith('tenor://')) return;
+  const listenerPromise = CapApp.addListener('appUrlOpen', (event) => {
+    void (async () => {
+      try {
+        const url = event.url;
+        if (!url?.startsWith('tenor://auth-callback')) return;
 
-          // 4. Extract `code` from the callback URL and hand it to
-          // Supabase to exchange for a real session. PKCE flow.
-          const parsed = new URL(url);
-          const code = parsed.searchParams.get('code');
-          const errorCode = parsed.searchParams.get('error');
-          if (errorCode) {
-            finish(() => {
-              throw new Error(
-                parsed.searchParams.get('error_description') ?? errorCode,
-              );
-            });
-            return;
-          }
-          if (!code) return; // not the right callback — wait for it
+        const parsed = new URL(url);
 
-          finish(async () => {
-            const { error: exchangeErr } =
-              await supabase!.auth.exchangeCodeForSession(code);
-            if (exchangeErr) throw exchangeErr;
-            const sub = await subPromise;
-            await sub.remove();
+        // Hash flow: tenor://auth-callback#access_token=...&refresh_token=...
+        const hash = parsed.hash.startsWith('#') ? parsed.hash.slice(1) : parsed.hash;
+        const hashParams = new URLSearchParams(hash);
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        if (accessToken && refreshToken) {
+          const { error } = await supabase!.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
           });
-        } catch (err) {
-          finish(() => {
-            throw err;
-          });
+          if (!error) onSession();
+          return;
         }
-      })();
-    });
 
-    // Hard timeout so a user who bails out of the OAuth screen can
-    // recover from a stuck Promise.
-    setTimeout(() => {
-      finish(async () => {
-        const sub = await subPromise;
-        await sub.remove();
-        throw new Error('Google sign-in timed out');
-      });
-    }, 5 * 60 * 1000);
+        // PKCE flow: tenor://auth-callback?code=...
+        const code = parsed.searchParams.get('code');
+        if (!code) return;
+        const { error } = await supabase!.auth.exchangeCodeForSession(code);
+        if (!error) onSession();
+      } catch {
+        // silently ignore — user stays on auth screen
+      }
+    })();
   });
+
+  return () => {
+    void listenerPromise.then((sub) => sub.remove());
+  };
 }

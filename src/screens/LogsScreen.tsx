@@ -78,16 +78,11 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
 
   function changeView(next: LogView) {
     setView(next);
-    if (next === 'D') {
-      // Switching to Day → land on today, not the start of whatever
-      // period the user was browsing. Drill-down from a Week-bar /
-      // Month-cell still routes to that specific day via drillTo().
-      setAnchor(periodStart('D', TODAY));
-    } else {
-      // For W / M / Y keep the user's browsing context — re-anchor
-      // to the equivalent period containing the current anchor.
-      setAnchor(periodStart(next, anchor));
-    }
+    // Tapping a tab always lands on the period that contains TODAY,
+    // regardless of where the user was browsing. Drill-down from a
+    // Week-bar / Month-cell still routes to a specific target via
+    // drillTo() — the tab tap is the "go home" gesture.
+    setAnchor(periodStart(next, TODAY));
   }
   function go(dir: -1 | 1) {
     const candidate = shiftPeriod(view, anchor, dir);
@@ -264,6 +259,13 @@ function DayBody({
 
   return (
     <>
+      {dayLogs.length > 0 && (
+        <section className="logs-section">
+          <h3 className="logs-section__title">Your day&apos;s mood</h3>
+          <DayMoodLine logs={dayLogs} />
+        </section>
+      )}
+
       {dayLogs.length === 0 ? (
         <p className="logs-empty">no logs on this day</p>
       ) : (
@@ -272,13 +274,6 @@ function DayBody({
             <LogEntryCard key={entry.id} entry={entry} onOpen={onOpenLog} />
           ))}
         </div>
-      )}
-
-      {dayLogs.length > 0 && (
-        <section className="logs-section">
-          <h3 className="logs-section__title">Your day&apos;s mood</h3>
-          <DayMoodLine logs={dayLogs} />
-        </section>
       )}
     </>
   );

@@ -54,11 +54,11 @@ export default function AuthScreen() {
     setBusy(true);
     try {
       if (isNative) {
-        // Native iOS path: opens Safari View, waits for tenor://
-        // callback, exchanges the code for a session. After this
-        // resolves we're authenticated — useAuth picks it up.
+        // Native iOS: opens system Safari and returns immediately.
+        // The tenor:// callback is handled globally in useAuth, which
+        // exchanges the code and triggers onAuthStateChange → re-render.
         await signInWithGoogleNative();
-        setBusy(false);
+        setBusy(false); // reset button — auth state change drives the UI
       } else {
         // Web path: window.location redirect. No further code runs
         // here — after Google bounces back, detectSessionInUrl picks

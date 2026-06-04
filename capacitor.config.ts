@@ -20,9 +20,9 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   ios: {
     scheme: 'tenor',
-    // Allow http for any local dev assets if needed; harmless for
-    // a production build because we don't make any http requests.
-    contentInset: 'always',
+    // Edge-to-edge: WKWebView extends behind the home indicator so the
+    // aurora gradient paints all the way down — no white inset / "notch".
+    contentInset: 'never',
   },
   plugins: {
     // Splash screen and status bar can be configured later; leaving

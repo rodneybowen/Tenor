@@ -16,6 +16,17 @@ const native = Capacitor.isNativePlatform();
 const canWebVibrate =
   typeof navigator !== 'undefined' && 'vibrate' in navigator;
 
+/** Wake the iOS Taptic Engine without firing a haptic.
+ *  Capacitor's `Haptics.selectionStart()` maps to
+ *  `UISelectionFeedbackGenerator.prepare()` — silent, just primes the
+ *  engine so the first real haptic isn't delayed or dropped. Call this
+ *  on mount of any screen that relies on rapid-fire scroll haptics. */
+export function prime(): void {
+  if (native) {
+    void Haptics.selectionStart().catch(() => undefined);
+  }
+}
+
 /** A light tap — e.g. selecting an emotion chip. */
 export function tap(): void {
   if (native) {
