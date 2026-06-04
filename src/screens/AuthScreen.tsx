@@ -3,9 +3,15 @@ import { GoogleLogo } from '@phosphor-icons/react';
 import { signIn, signInWithGoogle, signUp, type Role } from '../lib/supabase';
 import { isNative, signInWithGoogleNative } from '../lib/nativeAuth';
 
+interface AuthScreenProps {
+  /** Drops the user into the guest experience (full app, no account,
+   *  logs in sessionStorage). Wired in App.tsx → useAuth.enterGuest. */
+  onContinueAsGuest: () => void;
+}
+
 type Mode = 'signin' | 'signup';
 
-export default function AuthScreen() {
+export default function AuthScreen({ onContinueAsGuest }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -220,6 +226,20 @@ export default function AuthScreen() {
               your linked therapist.
             </p>
           )}
+
+          <div className="auth-guest">
+            <button
+              type="button"
+              className="auth-guest__btn"
+              onClick={onContinueAsGuest}
+              disabled={busy}
+            >
+              Continue as guest
+            </button>
+            <p className="auth-guest__note">
+              Your logs in guest mode will be lost once you close Tenor.
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -2271,6 +2271,52 @@ button {
   cursor: default;
 }
 
+/* ── Guest mode — "Continue as guest" + disclaimer ─────────────
+   Sits below the Google button. The button itself reads as a quiet
+   text link (no border, no fill) so the primary paths (sign in / sign
+   up / Google) stay visually dominant. The disclaimer line sets clear
+   expectations: guest logs are session-only. */
+.auth-guest {
+  margin: 16px 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.auth-guest__btn {
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--charcoal);
+  opacity: 0.72;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(34, 34, 34, 0.35);
+  cursor: pointer;
+  transition: opacity 0.18s;
+}
+.auth-guest__btn:hover {
+  opacity: 0.92;
+}
+.auth-guest__btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.auth-guest__note {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 300;
+  color: var(--charcoal);
+  opacity: 0.5;
+  line-height: 1.4;
+  text-align: center;
+  max-width: 240px;
+}
+
 /* ── HIPAA reassurance footer ─────────────── */
 .auth-hipaa {
   margin: 4px 0 0;

@@ -22,6 +22,7 @@ import {
   insertLog,
   dbLogToLogEntry,
 } from './lib/supabase';
+import { buildGuestSeed, loadGuestLogs, saveGuestLogs } from './lib/guestSeed';
 
 type Screen =
   | 'home'
@@ -61,14 +62,44 @@ export default function App() {
   const screenIsAuth =
     auth.state.status === 'unauthenticated' ||
     auth.state.status === 'needs-profile';
+  const isGuest = auth.state.status === 'guest';
 
   const [screen, setScreen] = useState<Screen>('home');
-  // Initial logs state: ALL_LOGS in mock/dev mode (no Supabase env vars
-  // → fully offline preview), empty when Supabase is wired (real data
-  // arrives via fetchLogs once the user authenticates).
-  const [logs, setLogs] = useState<LogEntry[]>(() =>
-    supabase ? [] : ALL_LOGS,
-  );
+  // Initial logs state precedence:
+  //   guest      → restore from sessionStorage if present, otherwise
+  //                seed 4 yesterday logs and start fresh
+  //   Supabase   → start empty; fetchLogs fills it once authenticated
+  //   mock/dev   → ALL_LOGS (180-day seed) so the prototype has data
+  const [logs, setLogs] = useState<LogEntry[]>(() => {
+    if (isGuest) {
+      return loadGuestLogs() ?? buildGuestSeed();
+    }
+    return supabase ? [] : ALL_LOGS;
+  });
+
+  // Guest mode: persist every logs change to sessionStorage so a
+  // reload-in-tab keeps the same data. Cleared automatically on tab
+  // close (sessionStorage lifetime).
+  useEffect(() => {
+    if (!isGuest) return;
+    saveGuestLogs(logs);
+  }, [logs, isGuest]);
+
+  // If the user enters guest mode after the initial render (clicks
+  // "Continue as guest" on the auth screen), seed the logs the moment
+  // we know they're a guest and nothing is stored yet.
+  useEffect(() => {
+    if (!isGuest) return;
+    const stored = loadGuestLogs();
+    if (stored) {
+      setLogs(stored);
+    } else {
+      const seed = buildGuestSeed();
+      setLogs(seed);
+      saveGuestLogs(seed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGuest]);
 
   // When the user authenticates (or arrives already authenticated),
   // pull their real logs from Supabase. RLS guarantees we only get
@@ -282,7 +313,9 @@ export default function App() {
       <div className="app-root">
         <BlobField />
         <GrainOverlay />
-        {auth.state.status === 'unauthenticated' && <AuthScreen />}
+        {auth.state.status === 'unauthenticated' && (
+          <AuthScreen onContinueAsGuest={auth.enterGuest} />
+        )}
         {auth.state.status === 'needs-profile' && (
           <ProfileSetupScreen
             userId={auth.state.userId}
@@ -316,7 +349,9 @@ export default function App() {
           displayName={
             auth.state.status === 'authenticated'
               ? auth.state.profile.display_name
-              : undefined
+              : isGuest
+              ? null  // explicit "no name" → greeting renders without a name
+              : undefined  // dev/mock → falls back to 'Rohan'
           }
           onLog={() => setScreen('logMethod')}
           onViewLogs={() => setScreen('logs')}

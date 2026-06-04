@@ -11,9 +11,10 @@ function greetingFor(hour: number): string {
 
 interface Props {
   logs: LogEntry[];
-  /** From the signed-in profile when Supabase is on; falls back to
-   *  'Rohan' for the mock/dev experience so the screen still looks
-   *  populated without an auth session. */
+  /** Name-rendering rules:
+   *    string → "Good morning, {name}."   (authenticated)
+   *    undefined → falls back to 'Rohan'   (dev/mock)
+   *    null → "Good morning."              (guest — no name) */
   displayName?: string | null;
   onLog: () => void;
   onViewLogs: () => void;
@@ -27,7 +28,13 @@ export default function HomeScreen({
   onViewLogs,
   onOpenLog,
 }: Props) {
-  const name = displayName?.trim() || 'Rohan';
+  // `null` is an explicit "no name" signal from guest mode. `undefined`
+  // means we have no profile yet (dev/mock) and should fall back so
+  // the greeting still reads.
+  const name =
+    displayName === null
+      ? null
+      : displayName?.trim() || 'Rohan';
   const [selectedKey, setSelectedKey] = useState(TODAY_KEY);
 
   return (
@@ -36,9 +43,13 @@ export default function HomeScreen({
       <div className="home-scroll">
         <header className="hero">
           <h1 className="greeting">
-            {greetingFor(TODAY.getHours())},
-            <br />
-            <em>{name}.</em>
+            {greetingFor(TODAY.getHours())}{name ? ',' : '.'}
+            {name && (
+              <>
+                <br />
+                <em>{name}.</em>
+              </>
+            )}
           </h1>
 
           <div className="fab-zone">
