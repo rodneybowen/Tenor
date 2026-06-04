@@ -158,6 +158,13 @@ export default function EmotionGridScreen({
   const suppressClickRef = useRef(false);
   const [dragging, setDragging] = useState(false);
 
+  // Tracks the pointer ID we captured (if any) so we can release it in
+  // pointerup. We DEFER setPointerCapture until movement crosses the
+  // drag threshold — capturing on pointerdown would route the synthesized
+  // click event to the viewport instead of the chip, breaking desktop
+  // selection. Touch doesn't hit this code path (early return below).
+  const capturedPointerRef = useRef<number | null>(null);
+
   function onPointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType !== 'mouse' || e.button !== 0) return;
     const vp = viewportRef.current;
@@ -169,7 +176,7 @@ export default function EmotionGridScreen({
       sTop: vp.scrollTop,
       moved: false,
     };
-    vp.setPointerCapture(e.pointerId);
+    // Do NOT setPointerCapture here. See note above.
   }
 
   function onPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
@@ -181,6 +188,15 @@ export default function EmotionGridScreen({
     if (!drag.moved && Math.hypot(dx, dy) > 4) {
       drag.moved = true;
       setDragging(true);
+      // Now that this is definitively a drag, capture the pointer so
+      // we keep getting move events even if the cursor leaves the
+      // viewport. The click event was going to be suppressed anyway.
+      try {
+        vp.setPointerCapture(e.pointerId);
+        capturedPointerRef.current = e.pointerId;
+      } catch {
+        // setPointerCapture can throw if the pointer is already gone.
+      }
     }
     if (drag.moved) {
       vp.scrollLeft = drag.sLeft - dx;
@@ -191,6 +207,15 @@ export default function EmotionGridScreen({
   function onPointerUp() {
     const moved = dragRef.current?.moved ?? false;
     dragRef.current = null;
+    if (capturedPointerRef.current !== null) {
+      const vp = viewportRef.current;
+      try {
+        vp?.releasePointerCapture(capturedPointerRef.current);
+      } catch {
+        // ignore — pointer may already be released
+      }
+      capturedPointerRef.current = null;
+    }
     if (moved) {
       suppressClickRef.current = true;
       requestAnimationFrame(() => {
