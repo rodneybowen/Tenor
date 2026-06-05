@@ -2672,3 +2672,22 @@ button {
   padding: 12px 24px;
   margin-top: 0;
 }
+
+/* ════════════════════════════════════════════
+   EmotionGrid loading state
+   ════════════════════════════════════════════ */
+/* Centered spinner shown while the live vocabulary CSV is loading on
+   first mount. The viewport stays mounted underneath (visibility:hidden)
+   so refs + scroll/interaction effects keep working; the spinner just
+   covers the empty space and the footer is omitted until chips arrive. */
+.eg-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--charcoal);
+  opacity: 0.55;
+  pointer-events: none;
+}

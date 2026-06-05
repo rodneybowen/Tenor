@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
-import { CaretRight } from '@phosphor-icons/react';
+import { CaretRight, CircleNotch } from '@phosphor-icons/react';
 import BackButton from '../components/BackButton';
 import {
   EMOTION_DEFINITIONS,
@@ -129,10 +129,14 @@ export default function EmotionGridScreen({
   const chipRefs = useRef(new Map<string, HTMLButtonElement>());
   const rafRef = useRef<number | null>(null);
 
-  // Live vocabulary from the published Google Sheet (cached at
-  // module level). Until it arrives, show the static fallback so
-  // the screen never blanks.
-  const { vocab } = useVocabulary();
+  // Live vocabulary from the published Google Sheet (cached at module
+  // level — second mount is synchronous). On first load we wait for
+  // the fetch to resolve and show a spinner instead of rendering
+  // chips against the stale fallback list. If the fetch errors, we
+  // drop back to the hardcoded `EMOTION_DEFINITIONS` / `fallbackVocab`
+  // so the user is never stuck.
+  const { vocab, error } = useVocabulary();
+  const loading = vocab === null && error === null;
   const byCategory: VocabByCategory = vocab?.byCategory ?? fallbackVocab();
   const definitionByName: Record<string, string> = useMemo(() => {
     if (vocab) return vocab.definitions;
@@ -403,6 +407,12 @@ export default function EmotionGridScreen({
         <span className="eg-spacer" aria-hidden="true" />
       </header>
 
+      {loading && (
+        <div className="eg-loading" role="status" aria-label="Loading emotions">
+          <CircleNotch size={32} weight="bold" className="spin" />
+        </div>
+      )}
+
       <div
         className={'eg-viewport' + (dragging ? ' eg-viewport--dragging' : '')}
         ref={viewportRef}
@@ -412,6 +422,8 @@ export default function EmotionGridScreen({
         onPointerCancel={onPointerUp}
         onClickCapture={onClickCapture}
         aria-label="Emotion grid"
+        aria-hidden={loading ? 'true' : undefined}
+        style={loading ? { visibility: 'hidden' } : undefined}
       >
         <div
           className="eg-plane"
@@ -454,26 +466,28 @@ export default function EmotionGridScreen({
         </div>
       </div>
 
-      <footer className="eg-footer">
-        <div className="eg-def" aria-live="polite">
-          <span
-            className="eg-def__word"
-            style={{ background: tintQuadrant(centered.quadrant, 0.6, 1) }}
+      {!loading && (
+        <footer className="eg-footer">
+          <div className="eg-def" aria-live="polite">
+            <span
+              className="eg-def__word"
+              style={{ background: tintQuadrant(centered.quadrant, 0.6, 1) }}
+            >
+              &ldquo;{centered.name}&rdquo;
+            </span>
+            <p className="eg-def__body">{definitionByName[centered.name] ?? ''}</p>
+          </div>
+          <button
+            type="button"
+            className="btn-primary eg-next"
+            disabled={selected.length === 0}
+            onClick={onNext}
           >
-            &ldquo;{centered.name}&rdquo;
-          </span>
-          <p className="eg-def__body">{definitionByName[centered.name] ?? ''}</p>
-        </div>
-        <button
-          type="button"
-          className="btn-primary eg-next"
-          disabled={selected.length === 0}
-          onClick={onNext}
-        >
-          next
-          <CaretRight size={16} weight="bold" />
-        </button>
-      </footer>
+            next
+            <CaretRight size={16} weight="bold" />
+          </button>
+        </footer>
+      )}
     </div>
   );
 }
