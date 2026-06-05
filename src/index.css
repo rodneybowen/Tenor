@@ -2543,8 +2543,11 @@ button {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* No floating footer on this screen — the "+ add to this log" button
+     is inline at the bottom of the chain. Just enough bottom padding
+     to clear the home indicator. */
   padding: calc(var(--fade-top-end) + 60px) 20px
-           calc(96px + env(safe-area-inset-bottom, 0px) + 20px);
+           calc(40px + env(safe-area-inset-bottom, 0px));
   /* Match home/logs: aurora-extends-to-top + content fades into status bar. */
   -webkit-mask-image: linear-gradient(
     to bottom,
@@ -2619,29 +2622,53 @@ button {
   text-align: center;
 }
 
-/* ── Log list (chronological inside the thread) ── */
-.lt-list {
+/* ── Log chain (cards + connector segments + inline + add button) ──
+   Per sketch, every consecutive pair of items in the chain is joined
+   by a vertical dotted line in the gap between them — including the
+   gap between the last card and the "+ add to this log" button.
+   No `gap` on the column; each row supplies its own bottom margin
+   via the connector element so the line sits in a known space. */
+.lt-chain {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
+  align-items: stretch;
 }
-.lt-list__row {
+.lt-chain__row {
   position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-
-/* ── Footer + add CTA ────────────────────── */
-.lt-footer {
-  position: absolute;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-  left: 20px;
-  right: 20px;
-  z-index: 20;
+.lt-chain__row > :first-child {
+  align-self: stretch;
 }
-.lt-footer__add {
-  width: 100%;
+/* The dotted connector lives below each row (and the [data-last]
+   row's segment leads into the "+ add" button). Uniform 20px tall
+   so spacing reads consistent. */
+.lt-chain__line {
+  display: block;
+  width: 2px;
+  height: 20px;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(34, 34, 34, 0.45) 0,
+    rgba(34, 34, 34, 0.45) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  background-size: 100% 8px;
+  background-repeat: repeat-y;
+  pointer-events: none;
+}
+/* Inline "+ add to this log" — replaces the old absolute footer so
+   the chain's dotted line can terminate at it. Self-centered, fixed
+   width so it doesn't stretch full-bleed and feel like a banner. */
+.lt-chain__add {
+  align-self: center;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  padding: 12px 24px;
+  margin-top: 0;
 }

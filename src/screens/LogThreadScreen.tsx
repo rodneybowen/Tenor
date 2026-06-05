@@ -139,31 +139,38 @@ export default function LogThreadScreen({
           <DayMoodLine logs={threadLogs} />
         </section>
 
-        <section className="lt-list" aria-label="Logs in this thread">
-          {threadLogs.map((entry) => {
+        {/* Cards + "+ add to this log" share one flex column. Each
+            gap between consecutive cards (and between the last card
+            and the button) renders a dotted vertical line — per sketch.
+            The button is INLINE here, not a floating footer; the line
+            terminates at it. */}
+        <section className="lt-chain" aria-label="Logs in this thread">
+          {threadLogs.map((entry, i) => {
             const label = formatDateLabel(new Date(entry.ts), useDayName);
             return (
-              <div key={entry.id} className="lt-list__row">
+              <div key={entry.id} className="lt-chain__row">
                 <LogEntryCard
                   entry={{ ...entry, time: label }}
                   onOpen={onOpenLog}
                 />
+                <span
+                  className="lt-chain__line"
+                  aria-hidden="true"
+                  data-last={i === threadLogs.length - 1 ? 'true' : 'false'}
+                />
               </div>
             );
           })}
+          <button
+            type="button"
+            className="btn-primary lt-chain__add"
+            onClick={onAddToLog}
+          >
+            <Plus size={16} weight="bold" />
+            add to this log
+          </button>
         </section>
       </div>
-
-      <footer className="lt-footer">
-        <button
-          type="button"
-          className="btn-primary lt-footer__add"
-          onClick={onAddToLog}
-        >
-          <Plus size={16} weight="bold" />
-          add to this log
-        </button>
-      </footer>
     </div>
   );
 }
