@@ -175,7 +175,7 @@ export default function AccountScreen({
         <div className="acct-signout-zone">
           <button
             type="button"
-            className="acct-signout"
+            className="btn-primary acct-signout"
             onClick={handleSignOut}
             disabled={signingOut}
           >
@@ -184,7 +184,7 @@ export default function AccountScreen({
             ) : (
               <SignOut size={16} weight="bold" />
             )}
-            Sign out
+            sign out
           </button>
         </div>
       </div>
