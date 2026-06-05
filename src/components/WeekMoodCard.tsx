@@ -7,7 +7,7 @@ import {
   type LogEntry,
 } from '../data/mockLogs';
 import { dotBackground } from '../theme/emotions';
-import LogEntryCard from './LogEntryCard';
+import DayLogList from './DayLogList';
 
 interface Props {
   logs: LogEntry[];
@@ -73,11 +73,11 @@ export default function WeekMoodCard({
       <div className="day-label">{selectedDay.label}</div>
 
       {dayLogs.length > 0 ? (
-        <div className="log-list">
-          {dayLogs.map((entry) => (
-            <LogEntryCard key={entry.id} entry={entry} onOpen={onOpenLog} />
-          ))}
-        </div>
+        <DayLogList
+          dayLogs={dayLogs}
+          allLogs={logs}
+          onOpen={onOpenLog}
+        />
       ) : (
         <p className="log-empty__msg">
           {selectedIsToday ? 'no logs today yet' : 'no logs on this day'}

@@ -20,6 +20,16 @@ export interface LogEntry {
    *  detail screen can color each chip by its own quadrant. Parallel
    *  to `keywords`. Falls back to `quadrants[0]` for legacy mock logs. */
   chips?: { text: string; quadrant: Quadrant | null }[];
+  /** Thread linkage. NULL = standalone log OR the root of a thread.
+   *  Set to the root log's id on every child log appended via
+   *  "+ add to this log". Threads are flat (no branching) — every log
+   *  in a thread points to the same root. */
+  parentLogId?: string | null;
+  /** User-named thread topic. In the DB this is stored only on the
+   *  root log; the client denormalizes it onto every member of the
+   *  thread (root + children) after fetch so card rendering is a
+   *  direct field read with no lookup. */
+  topic?: string | null;
 }
 
 export interface WeekDay {

@@ -2344,3 +2344,323 @@ button {
 }
 .auth-link:hover { opacity: 0.85; }
 .auth-link:disabled { opacity: 0.3; cursor: default; }
+
+/* ════════════════════════════════════════════
+   Topic naming popup ("Add to this log")
+   ════════════════════════════════════════════ */
+.topic-popup-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(34, 34, 34, 0.32);
+  animation: topic-popup-in 0.18s ease-out;
+}
+@keyframes topic-popup-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.topic-popup-card {
+  width: 100%;
+  max-width: 360px;
+  background: #ffffff;
+  border-radius: var(--r-card);
+  padding: 24px 20px 20px;
+  box-shadow: 0 12px 40px rgba(34, 34, 34, 0.18),
+              0 2px 8px rgba(34, 34, 34, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: topic-popup-rise 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes topic-popup-rise {
+  from { transform: translateY(8px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.topic-popup-title {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--charcoal);
+  text-align: center;
+}
+.topic-popup-sub {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 300;
+  color: var(--charcoal);
+  opacity: 0.6;
+  text-align: center;
+  line-height: 1.45;
+}
+.topic-popup-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 4px;
+}
+.topic-popup-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--charcoal);
+  background: #f5f5f5;
+  border: 1.5px solid transparent;
+  border-radius: 14px;
+  outline: none;
+  transition: border-color 0.18s, background 0.18s;
+}
+.topic-popup-input:focus {
+  border-color: rgba(34, 34, 34, 0.25);
+  background: #ffffff;
+}
+.topic-popup-input::placeholder {
+  color: var(--charcoal);
+  opacity: 0.32;
+}
+.topic-popup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.topic-popup-skip {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--charcoal);
+  opacity: 0.55;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: opacity 0.18s;
+}
+.topic-popup-skip:hover { opacity: 0.85; }
+.topic-popup-confirm {
+  flex: 1;
+  height: 44px;
+  background: var(--charcoal);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: opacity 0.18s, transform 0.12s;
+}
+.topic-popup-confirm:active { transform: scale(0.985); }
+.topic-popup-confirm:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* ════════════════════════════════════════════
+   Thread cards — "X logs" pill + same-day dotted connector
+   ════════════════════════════════════════════ */
+
+/* Day-grouped list wrapper. `relative` so the dotted connector can
+   absolute-position itself against the list and span the full thread
+   range. Same layout as the legacy `.log-list` / `.logs-list` so we
+   can drop it in without changing surrounding spacing. */
+.day-log-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+.day-log-list__card {
+  position: relative;
+  z-index: 1;
+}
+
+/* Vertical dotted line connecting same-day thread cards. Sits BEHIND
+   the cards (z-index 0); cards have opaque backgrounds at z-index 1
+   so any unrelated card between two thread cards visually obscures
+   the line. The line is 2px wide for legibility on mobile DPR. */
+.thread-connector {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  z-index: 0;
+  background-image: linear-gradient(
+    to bottom,
+    rgba(34, 34, 34, 0.42) 0,
+    rgba(34, 34, 34, 0.42) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  background-size: 100% 8px;
+  background-repeat: repeat-y;
+  pointer-events: none;
+}
+
+/* "X logs" pill on the bottom border of a threaded card.
+   Sits half-in / half-out, horizontally centered. Solid white over
+   border so the card's gradient bg doesn't tint the pill. */
+.log-card--threaded {
+  /* Extra bottom margin so the pill doesn't crowd the next card. */
+  margin-bottom: 6px;
+}
+.log-card__thread-pill {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  transform: translateX(-50%);
+  z-index: 2;
+  /* Label font per design system (Montserrat Light 16 with letter-
+     spacing). Compact for a pill — same family/weight, smaller size. */
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  background: #ffffff;
+  border: 1px solid rgba(34, 34, 34, 0.15);
+  padding: 2px 10px;
+  border-radius: var(--r-pill);
+  box-shadow: 0 1px 4px rgba(34, 34, 34, 0.06);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* `.log-card` is the card surface. It needs `position: relative` so
+   the pill can position against it. (Existing rule sets the bg only.) */
+.log-card {
+  position: relative;
+}
+
+/* ════════════════════════════════════════════
+   LogThreadScreen — "Add to this log" thread view
+   ════════════════════════════════════════════ */
+.lt-header {
+  position: absolute;
+  top: calc(var(--fade-top-end) + 8px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 0 20px;
+  pointer-events: none;
+}
+.lt-header > * { pointer-events: auto; }
+
+.lt-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: calc(var(--fade-top-end) + 60px) 20px
+           calc(96px + env(safe-area-inset-bottom, 0px) + 20px);
+  /* Match home/logs: aurora-extends-to-top + content fades into status bar. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.25) calc(env(safe-area-inset-top, 0px) + 4px),
+    #000 var(--fade-top-end)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.25) calc(env(safe-area-inset-top, 0px) + 4px),
+    #000 var(--fade-top-end)
+  );
+}
+.lt-scroll::-webkit-scrollbar { display: none; }
+
+/* ── Topic heading ───────────────────────── */
+.lt-topic {
+  margin-bottom: 28px;
+  text-align: center;
+}
+.lt-topic__heading {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-block;
+}
+.lt-topic__heading h1 {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--charcoal);
+  margin: 0;
+  border-bottom: 1.5px dashed rgba(34, 34, 34, 0.35);
+  padding-bottom: 4px;
+  line-height: 1.3;
+}
+.lt-topic__form {
+  display: flex;
+  justify-content: center;
+}
+.lt-topic__input {
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 400;
+  color: var(--charcoal);
+  background: transparent;
+  border: none;
+  border-bottom: 1.5px solid var(--charcoal);
+  text-align: center;
+  outline: none;
+  padding: 0 4px 4px;
+  min-width: 200px;
+  max-width: 320px;
+}
+
+/* ── Mood section ────────────────────────── */
+.lt-mood {
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.lt-mood__title {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 400;
+  color: var(--charcoal);
+  margin: 0;
+  text-align: center;
+}
+
+/* ── Log list (chronological inside the thread) ── */
+.lt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.lt-list__row {
+  position: relative;
+}
+
+/* ── Footer + add CTA ────────────────────── */
+.lt-footer {
+  position: absolute;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  left: 20px;
+  right: 20px;
+  z-index: 20;
+}
+.lt-footer__add {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}

@@ -21,8 +21,17 @@ import {
   fetchLogs,
   insertLog,
   dbLogToLogEntry,
+  updateLogTopic,
 } from './lib/supabase';
 import { buildGuestSeed, loadGuestLogs, saveGuestLogs } from './lib/guestSeed';
+import {
+  denormalizeTopics,
+  getRootLogId,
+  isInThread,
+  setThreadTopic,
+} from './lib/threads';
+import LogThreadScreen from './screens/LogThreadScreen';
+import TopicNamingPopup from './components/TopicNamingPopup';
 
 type Screen =
   | 'home'
@@ -31,14 +40,16 @@ type Screen =
   | 'emotionGrid'
   | 'emotionReview'
   | 'logDetail'
+  | 'logThread'
   | 'logs'
   | 'chat'
   | 'account';
 
 /** Where the user came from when entering the log-detail screen. The × close
  *  button uses this to return them to the right spot (home after a fresh
- *  log, or the logs history if they were tapping into a past log there). */
-type DetailOrigin = 'home' | 'logs' | 'post-log';
+ *  log, or the logs history if they were tapping into a past log there).
+ *  'thread' = they tapped a card on the LogThreadScreen, so we return there. */
+type DetailOrigin = 'home' | 'logs' | 'post-log' | 'thread';
 
 const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
   chat: {
@@ -126,7 +137,10 @@ export default function App() {
     fetchLogs()
       .then((dbLogs) => {
         if (cancelled) return;
-        setLogs(dbLogs.map(dbLogToLogEntry));
+        // Topic only lives on the root row in the DB — denormalize onto
+        // every member of each thread so card / thread-screen rendering
+        // is a direct field read.
+        setLogs(denormalizeTopics(dbLogs.map(dbLogToLogEntry)));
       })
       .catch((err) => {
         console.error('[tenor] fetchLogs failed', err);
@@ -140,6 +154,23 @@ export default function App() {
   // to when the user hits ×.
   const [viewingLogId, setViewingLogId] = useState<string | null>(null);
   const [detailOrigin, setDetailOrigin] = useState<DetailOrigin>('home');
+
+  // Log-thread screen state — the root log id of the thread being viewed.
+  const [viewingThreadRootId, setViewingThreadRootId] = useState<string | null>(
+    null,
+  );
+
+  // "+ add to this log" state. When set, the next log submission attaches
+  // to this thread root and (if the thread had no topic yet) fires the
+  // topic-naming popup after submission.
+  const [pendingParentLogId, setPendingParentLogId] = useState<string | null>(
+    null,
+  );
+  // Root id whose topic the popup will name. Set right after a successful
+  // "add to this log" submission, only if the thread had no topic yet.
+  const [topicPromptRootId, setTopicPromptRootId] = useState<string | null>(
+    null,
+  );
 
   // Submission guard — second-line defense against the duplicate-log
   // bug: if a rapid second tap leaks past the screen's disabled UI,
@@ -167,6 +198,11 @@ export default function App() {
       new Set(chips.map((c) => c.quadrant).filter((q): q is Quadrant => q !== null)),
     );
 
+    // Pull and clear the pending thread root in one place so a partial
+    // failure can't leave the next standalone log accidentally threaded.
+    const parentLogId = pendingParentLogId;
+    setPendingParentLogId(null);
+
     // Authenticated → write through Supabase, then mirror into local state
     // so the home week card refreshes immediately.
     if (auth.state.status === 'authenticated') {
@@ -175,11 +211,11 @@ export default function App() {
           mode: 'speak',
           dateKey: TODAY_KEY,
           body: transcript,
+          parentLogId: parentLogId ?? null,
           chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
         });
         const entry = dbLogToLogEntry(result);
-        setLogs((prev) => [...prev, entry]);
-        openLogDetail(entry.id, 'post-log');
+        finalizeNewLog(entry, parentLogId);
         return;
       } catch (err) {
         console.error('[tenor] insertLog (voice) failed', err);
@@ -197,9 +233,9 @@ export default function App() {
       quadrants,
       body: transcript,
       chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+      parentLogId: parentLogId ?? null,
     };
-    setLogs((prev) => [...prev, entry]);
-    openLogDetail(entry.id, 'post-log');
+    finalizeNewLog(entry, parentLogId);
   }
 
   function pickQuadrant(q: Quadrant) {
@@ -237,20 +273,23 @@ export default function App() {
     const time = formatClock(now);
     const quadrants = Array.from(new Set(emotionSelected.map((s) => s.quadrant)));
 
+    const parentLogId = pendingParentLogId;
+    setPendingParentLogId(null);
+
     if (auth.state.status === 'authenticated') {
       try {
         const result = await insertLog({
           mode: 'select',
           dateKey: TODAY_KEY,
           body: emotionContext.trim() || null,
+          parentLogId: parentLogId ?? null,
           chips: emotionSelected.map((s) => ({
             text: s.name,
             quadrant: s.quadrant,
           })),
         });
         const entry = dbLogToLogEntry(result);
-        setLogs((prev) => [...prev, entry]);
-        openLogDetail(entry.id, 'post-log');
+        finalizeNewLog(entry, parentLogId);
         return;
       } catch (err) {
         console.error('[tenor] insertLog (emotion) failed', err);
@@ -268,9 +307,49 @@ export default function App() {
       quadrants,
       body: emotionContext.trim() || undefined,
       chips: emotionSelected.map((s) => ({ text: s.name, quadrant: s.quadrant })),
+      parentLogId: parentLogId ?? null,
     };
-    setLogs((prev) => [...prev, entry]);
-    openLogDetail(entry.id, 'post-log');
+    finalizeNewLog(entry, parentLogId);
+  }
+
+  /** Shared finish step for both submission paths. Handles the four
+   *  post-submit cases:
+   *
+   *    standalone log         → append + open LogDetailScreen (post-log)
+   *    first addition         → append, propagate topic onto root, then:
+   *                             if root has no topic yet → fire popup;
+   *                             once popup confirms/skips → LogThreadScreen
+   *    addition to named thread → append + propagate root's topic onto the
+   *                             new child + open LogThreadScreen directly
+   *
+   *  Where the user lands after first addition is determined here: the
+   *  popup's onConfirm/onSkip handlers route to LogThreadScreen. For
+   *  subsequent additions we go straight there since there's no popup. */
+  function finalizeNewLog(entry: LogEntry, parentLogId: string | null) {
+    if (!parentLogId) {
+      // Standalone — same as before threads.
+      setLogs((prev) => [...prev, entry]);
+      openLogDetail(entry.id, 'post-log');
+      return;
+    }
+
+    // Thread append. Read the root's current topic from the latest
+    // local state so we can stamp it onto the new child AND decide
+    // whether to fire the popup.
+    const rootId = parentLogId;
+    const root = logs.find((l) => l.id === rootId);
+    const existingTopic = root?.topic ?? null;
+    const childWithTopic: LogEntry = { ...entry, topic: existingTopic };
+    setLogs((prev) => [...prev, childWithTopic]);
+
+    if (!existingTopic || existingTopic.trim() === '') {
+      // First addition to an unnamed thread → popup, then thread screen.
+      setTopicPromptRootId(rootId);
+    } else {
+      // Named thread → straight to thread screen.
+      setViewingThreadRootId(rootId);
+      setScreen('logThread');
+    }
   }
 
   // ── Log-detail routing ─────────────────────────────────────────────
@@ -281,14 +360,75 @@ export default function App() {
   }
   function closeLogDetail() {
     // Send the user back to wherever they entered from. Post-log returns
-    // to home (most natural after-submission destination).
-    setScreen(detailOrigin === 'post-log' ? 'home' : detailOrigin);
+    // to home (most natural after-submission destination). Thread origin
+    // returns to the LogThreadScreen they opened the detail from.
+    if (detailOrigin === 'post-log') setScreen('home');
+    else if (detailOrigin === 'thread') setScreen('logThread');
+    else setScreen(detailOrigin);
   }
-  function addToThisLog() {
-    // TODO: implement true append semantics — for the prototype this just
-    // opens a fresh log-method flow. The new entry becomes its own log; we'll
-    // refactor to attach it to the parent log when the data model grows.
+  /** Kick off the "add to this log" flow from a log detail or thread
+   *  screen. Stashes the root id so the next submission attaches as a
+   *  child, then drops the user into the normal log-method selector.
+   *  Submission handlers consume + clear `pendingParentLogId`. */
+  function addToThisLog(sourceLogId: string) {
+    const source = logs.find((l) => l.id === sourceLogId);
+    if (!source) {
+      setScreen('logMethod');
+      return;
+    }
+    setPendingParentLogId(getRootLogId(source));
     setScreen('logMethod');
+  }
+
+  /** Open a log thread by its root id. Standalone-log callers should
+   *  use `openLogDetail` instead; the route is split intentionally. */
+  function openLogThread(rootId: string) {
+    setViewingThreadRootId(rootId);
+    setScreen('logThread');
+  }
+
+  /** A card-tapped router: decide which screen to open based on whether
+   *  the tapped log is in a thread. Used by HomeScreen + LogsScreen so
+   *  they don't have to know about threads themselves. */
+  function openLogFromCard(logId: string, origin: DetailOrigin) {
+    const log = logs.find((l) => l.id === logId);
+    if (log && isInThread(log, logs)) {
+      openLogThread(getRootLogId(log));
+    } else {
+      openLogDetail(logId, origin);
+    }
+  }
+
+  /** Persist a topic to the root + mirror it onto every thread member
+   *  in local state. Called by the topic-naming popup AND the inline
+   *  rename on LogThreadScreen. Pass empty/null to clear. */
+  async function saveThreadTopic(rootId: string, topic: string | null) {
+    const trimmed = topic?.trim() || null;
+    setLogs((prev) => setThreadTopic(prev, rootId, trimmed));
+    if (auth.state.status === 'authenticated') {
+      try {
+        await updateLogTopic(rootId, trimmed);
+      } catch (err) {
+        console.error('[tenor] updateLogTopic failed', err);
+        // Local state already mirrors the intended value; on failure the
+        // server-side topic stays stale until the next successful save.
+      }
+    }
+  }
+
+  /** Confirm or skip the first-addition topic popup. Either way we route
+   *  to the thread screen after dismissing the modal. Skip leaves the
+   *  topic NULL; the user can name it later via the inline rename. */
+  function handleTopicConfirm(rootId: string, topic: string) {
+    void saveThreadTopic(rootId, topic);
+    setTopicPromptRootId(null);
+    setViewingThreadRootId(rootId);
+    setScreen('logThread');
+  }
+  function handleTopicSkip(rootId: string) {
+    setTopicPromptRootId(null);
+    setViewingThreadRootId(rootId);
+    setScreen('logThread');
   }
 
   function handleNav(tab: NavTab) {
@@ -355,7 +495,7 @@ export default function App() {
           }
           onLog={() => setScreen('logMethod')}
           onViewLogs={() => setScreen('logs')}
-          onOpenLog={(id) => openLogDetail(id, 'home')}
+          onOpenLog={(id) => openLogFromCard(id, 'home')}
         />
       )}
 
@@ -405,7 +545,23 @@ export default function App() {
               log={log}
               justSubmitted={detailOrigin === 'post-log'}
               onClose={closeLogDetail}
-              onAddToLog={addToThisLog}
+              onAddToLog={() => addToThisLog(log.id)}
+            />
+          );
+        })()}
+
+      {screen === 'logThread' && viewingThreadRootId &&
+        (() => {
+          const root = logs.find((l) => l.id === viewingThreadRootId);
+          if (!root) return null;
+          return (
+            <LogThreadScreen
+              rootLogId={root.id}
+              allLogs={logs}
+              onBack={() => setScreen('home')}
+              onOpenLog={(id) => openLogDetail(id, 'thread')}
+              onAddToLog={() => addToThisLog(root.id)}
+              onRenameTopic={(name) => saveThreadTopic(root.id, name)}
             />
           );
         })()}
@@ -413,7 +569,14 @@ export default function App() {
       {screen === 'logs' && (
         <LogsScreen
           logs={logs}
-          onOpenLog={(id) => openLogDetail(id, 'logs')}
+          onOpenLog={(id) => openLogFromCard(id, 'logs')}
+        />
+      )}
+
+      {topicPromptRootId && (
+        <TopicNamingPopup
+          onConfirm={(name) => handleTopicConfirm(topicPromptRootId, name)}
+          onSkip={() => handleTopicSkip(topicPromptRootId)}
         />
       )}
 

@@ -19,15 +19,25 @@ const MODE_LABEL: Record<LogMode, string> = {
 interface Props {
   entry: LogEntry;
   onOpen?: (id: string) => void;
+  /** If set, render the "X logs" pill on the bottom border (half-in,
+   *  half-out, centered). When `undefined`/0 the pill is not rendered.
+   *  The caller is responsible for computing the count from the
+   *  thread; this component just draws. */
+  threadCount?: number;
 }
 
-export default function LogEntryCard({ entry, onOpen }: Props) {
+export default function LogEntryCard({ entry, onOpen, threadCount }: Props) {
   const ModeIcon = MODE_ICON[entry.mode];
   const clickable = !!onOpen;
+  const showPill = typeof threadCount === 'number' && threadCount > 1;
 
   return (
     <article
-      className={'log-card' + (clickable ? ' log-card--interactive' : '')}
+      className={
+        'log-card' +
+        (clickable ? ' log-card--interactive' : '') +
+        (showPill ? ' log-card--threaded' : '')
+      }
       style={{ background: blendGradient(entry.quadrants) }}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
@@ -62,6 +72,14 @@ export default function LogEntryCard({ entry, onOpen }: Props) {
       >
         <ModeIcon size={16} weight="regular" />
       </div>
+      {showPill && (
+        <span
+          className="log-card__thread-pill"
+          aria-label={`${threadCount} logs in this thread`}
+        >
+          {threadCount} logs
+        </span>
+      )}
     </article>
   );
 }

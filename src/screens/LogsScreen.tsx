@@ -23,7 +23,7 @@ import {
   shadeQuadrant,
   type Quadrant,
 } from '../theme/emotions';
-import LogEntryCard from '../components/LogEntryCard';
+import DayLogList from '../components/DayLogList';
 
 interface Props {
   logs: LogEntry[];
@@ -269,11 +269,11 @@ function DayBody({
       {dayLogs.length === 0 ? (
         <p className="logs-empty">no logs on this day</p>
       ) : (
-        <div className="logs-list">
-          {dayLogs.map((entry) => (
-            <LogEntryCard key={entry.id} entry={entry} onOpen={onOpenLog} />
-          ))}
-        </div>
+        <DayLogList
+          dayLogs={dayLogs}
+          allLogs={logs}
+          onOpen={onOpenLog}
+        />
       )}
     </>
   );
@@ -288,7 +288,7 @@ const BAND_Y: Record<Quadrant, number> = {
   hen: 0.88,
 };
 
-function DayMoodLine({ logs }: { logs: LogEntry[] }) {
+export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
   const W = 320;
   const H = 200;
   const padX = 12;

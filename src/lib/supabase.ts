@@ -68,6 +68,11 @@ export interface DbLog {
   logged_at: string; // ISO
   body: string | null;
   parent_log_id: string | null;
+  /** Thread topic — set only on the root row of a thread (the log with
+   *  parent_log_id = NULL that has at least one child). NULL on
+   *  standalone logs and on every child. The client denormalizes this
+   *  onto every thread member in memory; see `lib/threads.ts`. */
+  topic: string | null;
   created_at: string;
   deleted_at: string | null;
 }
@@ -252,6 +257,9 @@ export interface NewLogInput {
   dateKey: string; // 'YYYY-MM-DD' in the user's TZ
   body?: string | null;
   parentLogId?: string | null;
+  /** Only meaningful on the root log of a thread. Children should leave
+   *  this undefined — the topic lives on the root row. */
+  topic?: string | null;
   chips: { text: string; quadrant: Quadrant | null }[];
 }
 
@@ -273,6 +281,7 @@ export async function insertLog(input: NewLogInput): Promise<LogWithChips> {
       date_key: input.dateKey,
       body: input.body ?? null,
       parent_log_id: input.parentLogId ?? null,
+      topic: input.topic ?? null,
     })
     .select()
     .single();
@@ -329,5 +338,26 @@ export function dbLogToLogEntry(db: LogWithChips): LogEntry {
     quadrants,
     body: db.body ?? undefined,
     chips: db.chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+    parentLogId: db.parent_log_id,
+    topic: db.topic,
   };
+}
+
+/** Update the topic on the ROOT log of a thread. Use this when the
+ *  user renames via the LogThreadScreen header or names a brand-new
+ *  thread via the topic-naming popup. The caller should mirror the
+ *  change into local state via `setThreadTopic` from `lib/threads.ts`.
+ *
+ *  Topic only lives on the root row — passing a child log's id is a
+ *  bug at the caller. */
+export async function updateLogTopic(
+  rootLogId: string,
+  topic: string | null,
+): Promise<void> {
+  const sb = requireClient();
+  const { error } = await sb
+    .from('logs')
+    .update({ topic: topic && topic.trim() ? topic.trim() : null })
+    .eq('id', rootLogId);
+  if (error) throw error;
 }
