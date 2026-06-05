@@ -209,6 +209,47 @@ export async function signOut(): Promise<void> {
   await sb.auth.signOut();
 }
 
+/** Patch the user's display name. RLS scopes the write to their own
+ *  row. Returns the updated row so the caller can mirror into state. */
+export async function updateDisplayName(
+  userId: string,
+  displayName: string,
+): Promise<DbProfile> {
+  const sb = requireClient();
+  const { data, error } = await sb
+    .from('profiles')
+    .update({ display_name: displayName.trim() })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbProfile;
+}
+
+/** True if the current Supabase user already has a Google identity
+ *  linked. Used by AccountScreen to decide whether to show the "Link
+ *  Google account" CTA or the static "linked" label. */
+export async function hasGoogleIdentity(): Promise<boolean> {
+  const sb = requireClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return false;
+  return (user.identities ?? []).some((i) => i.provider === 'google');
+}
+
+/** Kicks off the link-Google-to-existing-account OAuth flow. Returns
+ *  to the current URL; after the redirect the identity is attached
+ *  and `hasGoogleIdentity()` will return true. */
+export async function linkGoogleIdentity(): Promise<void> {
+  const sb = requireClient();
+  const { error } = await sb.auth.linkIdentity({
+    provider: 'google',
+    options: { redirectTo: window.location.href },
+  });
+  if (error) throw error;
+}
+
 export async function getCurrentProfile(): Promise<DbProfile | null> {
   const sb = requireClient();
   const {

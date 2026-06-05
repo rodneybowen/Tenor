@@ -40,6 +40,10 @@ export interface AuthHook {
   enterGuest: () => void;
   /** Leave guest mode and drop guest logs from sessionStorage. */
   exitGuest: () => void;
+  /** Mirror an updated profile row into auth state without a server
+   *  round-trip. Use after a successful `updateDisplayName` so the
+   *  home greeting refreshes immediately. */
+  applyProfile: (profile: DbProfile) => void;
 }
 
 // Guest mode is remembered per-tab in sessionStorage. Survives reloads
@@ -141,5 +145,11 @@ export function useAuth(): AuthHook {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { state, refresh: check, enterGuest, exitGuest };
+  function applyProfile(profile: DbProfile) {
+    setState((prev) =>
+      prev.status === 'authenticated' ? { status: 'authenticated', profile } : prev,
+    );
+  }
+
+  return { state, refresh: check, enterGuest, exitGuest, applyProfile };
 }

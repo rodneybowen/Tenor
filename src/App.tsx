@@ -11,6 +11,7 @@ import EmotionReviewScreen from './screens/EmotionReviewScreen';
 import LogDetailScreen from './screens/LogDetailScreen';
 import LogsScreen from './screens/LogsScreen';
 import AuthScreen from './screens/AuthScreen';
+import AccountScreen from './screens/AccountScreen';
 import ProfileSetupScreen from './screens/ProfileSetupScreen';
 import { ALL_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
 import type { Detected } from './lib/emotionDetect';
@@ -56,10 +57,7 @@ const PLACEHOLDER: Partial<Record<Screen, { title: string; body: string }>> = {
     title: 'Chat',
     body: 'The communications tab with your therapist is out of scope for this prototype.',
   },
-  account: {
-    title: 'Account',
-    body: 'The account tab is out of scope for this prototype.',
-  },
+  // 'account' is a real screen now — see <AccountScreen /> below.
 };
 
 const isDemo = new URLSearchParams(window.location.search).get('demo') === '1';
@@ -594,6 +592,20 @@ export default function App() {
         />
       )}
 
+      {screen === 'account' && auth.state.status === 'authenticated' && (
+        <AccountScreen
+          profile={auth.state.profile}
+          onProfileUpdated={(next) => auth.applyProfile(next)}
+          onSignedOut={() => {
+            // Drop all in-memory log state so the next sign-in starts
+            // clean. The auth state listener will flip us to
+            // 'unauthenticated' and AuthScreen will render.
+            setLogs([]);
+            setScreen('home');
+          }}
+        />
+      )}
+
       {topicPromptRootId && (
         <TopicNamingPopup
           onConfirm={(name) => handleTopicConfirm(topicPromptRootId, name)}
@@ -622,7 +634,13 @@ export default function App() {
       {showNav && (
         <div className="app-fade app-fade--bottom" aria-hidden="true" />
       )}
-      {showNav && <PillNav active={navTab} onSelect={handleNav} />}
+      {showNav && (
+        <PillNav
+          active={navTab}
+          onSelect={handleNav}
+          hide={isGuest ? ['account'] : []}
+        />
+      )}
     </div>
   );
 }

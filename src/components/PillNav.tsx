@@ -12,12 +12,16 @@ const ITEMS: { id: NavTab; label: string; Icon: typeof House }[] = [
 interface Props {
   active: NavTab;
   onSelect: (tab: NavTab) => void;
+  /** Tabs to hide entirely. Used to remove Account in guest mode (no
+   *  profile to manage). The remaining tabs stay evenly spaced. */
+  hide?: NavTab[];
 }
 
-export default function PillNav({ active, onSelect }: Props) {
+export default function PillNav({ active, onSelect, hide = [] }: Props) {
+  const visible = ITEMS.filter((i) => !hide.includes(i.id));
   return (
     <nav className="pill-nav" aria-label="Primary">
-      {ITEMS.map(({ id, label, Icon }) => {
+      {visible.map(({ id, label, Icon }) => {
         const isActive = id === active;
         return (
           <button

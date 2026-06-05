@@ -2691,3 +2691,168 @@ button {
   opacity: 0.55;
   pointer-events: none;
 }
+
+/* ════════════════════════════════════════════
+   Account screen
+   ════════════════════════════════════════════ */
+.acct-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: calc(var(--fade-top-end) + 8px) 24px
+           calc(132px + env(safe-area-inset-bottom, 0px));
+  /* Same content-fade-into-status-bar mask used on Home / Logs. */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.25) calc(env(safe-area-inset-top, 0px) + 4px),
+    #000 var(--fade-top-end)
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    rgba(0, 0, 0, 0.25) calc(env(safe-area-inset-top, 0px) + 4px),
+    #000 var(--fade-top-end)
+  );
+}
+.acct-scroll::-webkit-scrollbar { display: none; }
+
+.acct-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 32px;
+  color: var(--charcoal);
+  margin: 0 0 28px;
+}
+
+.acct-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 28px;
+}
+.acct-label {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--charcoal);
+  opacity: 0.55;
+}
+
+/* ── Display name input + inline save ── */
+.acct-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.acct-input {
+  flex: 1;
+  padding: 12px 14px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  color: var(--charcoal);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1.5px solid rgba(34, 34, 34, 0.12);
+  border-radius: 14px;
+  outline: none;
+  transition: border-color 0.18s, background 0.18s;
+}
+.acct-input:focus {
+  border-color: rgba(34, 34, 34, 0.32);
+  background: #ffffff;
+}
+.acct-save {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--charcoal);
+  color: #ffffff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.18s, transform 0.12s;
+}
+.acct-save:active { transform: scale(0.94); }
+.acct-save:disabled { opacity: 0.45; cursor: default; }
+
+/* ── Account type read-only pill ── */
+.acct-pill {
+  align-self: flex-start;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(34, 34, 34, 0.12);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+}
+
+/* ── Linked accounts ── */
+.acct-meta {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--charcoal);
+  opacity: 0.55;
+}
+.acct-linked {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--charcoal);
+  opacity: 0.78;
+}
+.acct-link-google {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1.5px solid rgba(34, 34, 34, 0.22);
+}
+
+/* ── Sign out zone ── */
+.acct-signout-zone {
+  margin-top: 16px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(34, 34, 34, 0.1);
+}
+.acct-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--charcoal);
+  background: transparent;
+  border: 1.5px solid rgba(34, 34, 34, 0.18);
+  border-radius: var(--r-pill);
+  padding: 10px 18px;
+  cursor: pointer;
+  transition: background 0.18s, transform 0.12s;
+}
+.acct-signout:hover { background: rgba(34, 34, 34, 0.04); }
+.acct-signout:active { transform: scale(0.985); }
+.acct-signout:disabled { opacity: 0.5; cursor: default; }
+
+.acct-error {
+  margin: 4px 0 0;
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: #C80E0D;
+  opacity: 0.85;
+}
