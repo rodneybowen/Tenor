@@ -177,6 +177,14 @@ export default function App() {
   // the in-flight insert simply early-returns instead of double-writing.
   const submittingRef = useRef(false);
 
+  // Which snap section LogMethodScreen should land on when it opens.
+  // Reset to 'methods' on every entry except "back from emotion grid",
+  // where the user expects to land on the category picker, not the
+  // method picker they passed through on the way in.
+  const [lmInitialSection, setLmInitialSection] = useState<
+    'methods' | 'quadrants'
+  >('methods');
+
   // Emotion-selector flow state
   const [entryQuadrant, setEntryQuadrant] = useState<Quadrant>('hep');
   const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
@@ -371,6 +379,7 @@ export default function App() {
    *  child, then drops the user into the normal log-method selector.
    *  Submission handlers consume + clear `pendingParentLogId`. */
   function addToThisLog(sourceLogId: string) {
+    setLmInitialSection('methods');
     const source = logs.find((l) => l.id === sourceLogId);
     if (!source) {
       setScreen('logMethod');
@@ -493,7 +502,10 @@ export default function App() {
               ? null  // explicit "no name" → greeting renders without a name
               : undefined  // dev/mock → falls back to 'Rohan'
           }
-          onLog={() => setScreen('logMethod')}
+          onLog={() => {
+            setLmInitialSection('methods');
+            setScreen('logMethod');
+          }}
           onViewLogs={() => setScreen('logs')}
           onOpenLog={(id) => openLogFromCard(id, 'home')}
         />
@@ -504,13 +516,17 @@ export default function App() {
           onBack={() => setScreen('home')}
           onSpeak={() => setScreen('voice')}
           onPickQuadrant={pickQuadrant}
+          initialSection={lmInitialSection}
         />
       )}
 
       {screen === 'voice' && (
         <VoiceScreen
           demo={isDemo}
-          onBack={() => setScreen('logMethod')}
+          onBack={() => {
+            setLmInitialSection('methods');
+            setScreen('logMethod');
+          }}
           onConfirm={submitVoiceLog}
         />
       )}
@@ -520,7 +536,12 @@ export default function App() {
           entryQuadrant={entryQuadrant}
           selected={emotionSelected}
           onToggle={toggleEmotion}
-          onBack={() => setScreen('logMethod')}
+          onBack={() => {
+            // Land on the quadrant picker, not the method picker —
+            // the user just came from a quadrant choice.
+            setLmInitialSection('quadrants');
+            setScreen('logMethod');
+          }}
           onNext={() => setScreen('emotionReview')}
         />
       )}

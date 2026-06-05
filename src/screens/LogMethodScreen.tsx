@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   Microphone,
   PencilSimple,
@@ -13,6 +13,11 @@ interface Props {
   onBack: () => void;
   onSpeak: () => void;
   onPickQuadrant: (q: Quadrant) => void;
+  /** Which snap section to land on when this screen mounts.
+   *  Defaults to 'methods' (the speak/type page). Set to 'quadrants'
+   *  when returning from the EmotionGridScreen's back button so the
+   *  user lands on the category picker, not the method picker. */
+  initialSection?: 'methods' | 'quadrants';
 }
 
 // Layout matches the user's sketch:
@@ -24,6 +29,7 @@ export default function LogMethodScreen({
   onBack,
   onSpeak,
   onPickQuadrant,
+  initialSection = 'methods',
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const quadrantsRef = useRef<HTMLElement>(null);
@@ -32,6 +38,19 @@ export default function LogMethodScreen({
   function scrollTo(el: HTMLElement | null) {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+
+  // Land on the requested section on mount. Instant scroll (no smooth)
+  // so the screen feels like it "opens there" rather than animating
+  // from the top — important when arriving from EmotionGrid back, where
+  // smooth-animating from methods → quadrants would read as a transition.
+  useEffect(() => {
+    if (initialSection !== 'quadrants') return;
+    const el = quadrantsRef.current;
+    const sc = scrollRef.current;
+    if (!el || !sc) return;
+    sc.scrollTop = el.offsetTop;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="screen" id="log-method">
