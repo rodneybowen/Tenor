@@ -2481,34 +2481,12 @@ button {
 }
 .day-log-list__card {
   position: relative;
-  z-index: 1;
 }
 
-/* Vertical dotted line connecting same-day thread cards. Sits BEHIND
-   the cards (z-index 0); cards have opaque backgrounds at z-index 1
-   so any unrelated card between two thread cards visually obscures
-   the line. The line is 2px wide for legibility on mobile DPR. */
-.thread-connector {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 2px;
-  z-index: 0;
-  background-image: linear-gradient(
-    to bottom,
-    rgba(34, 34, 34, 0.42) 0,
-    rgba(34, 34, 34, 0.42) 4px,
-    transparent 4px,
-    transparent 8px
-  );
-  background-size: 100% 8px;
-  background-repeat: repeat-y;
-  pointer-events: none;
-}
-
-/* "X logs" pill on the bottom border of a threaded card.
-   Sits half-in / half-out, horizontally centered. Solid white over
-   border so the card's gradient bg doesn't tint the pill. */
+/* "X logs" pill on the bottom border of a threaded card. Bottom-right,
+   half-in / half-out. The pill alone signals thread membership — we
+   tried a dotted same-day connector but it felt inconsistent against
+   cross-day threads which never had one. */
 .log-card--threaded {
   /* Extra bottom margin so the pill doesn't crowd the next card. */
   margin-bottom: 6px;
