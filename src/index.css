@@ -2515,9 +2515,12 @@ button {
 }
 .log-card__thread-pill {
   position: absolute;
-  left: 50%;
+  /* Bottom-right per sketch — sits over the right side of the card's
+     bottom border, half-in / half-out. Reads as quiet metadata, not a
+     standalone tab. Connector segment in the gap above lines up
+     vertically with the next card's pill. */
+  right: 16px;
   bottom: -10px;
-  transform: translateX(-50%);
   z-index: 2;
   /* Label font per design system (Montserrat Light 16 with letter-
      spacing). Compact for a pill — same family/weight, smaller size. */

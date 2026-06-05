@@ -11,8 +11,9 @@ interface Props {
   onOpen?: (id: string) => void;
 }
 
-interface ConnectorGeom {
-  rootId: string;
+interface SegmentGeom {
+  /** Stable key for React reconciliation across re-measures. */
+  key: string;
   top: number;
   height: number;
 }
@@ -21,67 +22,65 @@ interface ConnectorGeom {
  * Renders a day's worth of LogEntryCard with two thread-aware features:
  *
  *   1. Each card in a thread gets a "X logs" pill via `threadCount`.
- *   2. For every thread with 2+ cards on this day, a vertical dotted
- *      line spans absolutely from the first thread card's center to
- *      the last thread card's center. The line sits behind cards
- *      (z-index 0); cards are opaque (z-index 1). Where an unrelated
- *      log card falls between two thread cards, the unrelated card's
- *      opaque background covers the line — visually "the dotted line
- *      passes behind the unrelated card" per spec.
+ *   2. For every consecutive pair of cards in the same thread on this
+ *      day, a vertical dotted SEGMENT is drawn in the gap between
+ *      them — from the bottom edge of card N to the top edge of card
+ *      N+1. We render per-gap (not a single span behind the cards)
+ *      because card backgrounds are translucent gradients; a
+ *      continuous line behind them would bleed through visually.
  *
- * The connector geometry is computed in a `useLayoutEffect` so we
- * measure after the browser has laid out the cards. It recomputes
- * when the day's logs change.
+ * Segments are positioned absolutely against the list container and
+ * measured in `useLayoutEffect` so the geometry is correct on first
+ * paint and re-measured when the day's logs change.
  */
 export default function DayLogList({ dayLogs, allLogs, onOpen }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [connectors, setConnectors] = useState<ConnectorGeom[]>([]);
-
-  // Group threads visible on this day.
-  const threadGroups = new Map<string, LogEntry[]>();
-  for (const log of dayLogs) {
-    const size = getThreadSize(log, allLogs);
-    if (size < 2) continue;
-    const rootId = getRootLogId(log);
-    const arr = threadGroups.get(rootId) ?? [];
-    arr.push(log);
-    threadGroups.set(rootId, arr);
-  }
+  const [segments, setSegments] = useState<SegmentGeom[]>([]);
 
   useLayoutEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     const containerTop = container.getBoundingClientRect().top;
-    const geoms: ConnectorGeom[] = [];
+    const geoms: SegmentGeom[] = [];
 
-    for (const [rootId, members] of threadGroups) {
-      if (members.length < 2) continue;
-      const firstEl = cardRefs.current.get(members[0].id);
-      const lastEl = cardRefs.current.get(members[members.length - 1].id);
-      if (!firstEl || !lastEl) continue;
-      const firstRect = firstEl.getBoundingClientRect();
-      const lastRect = lastEl.getBoundingClientRect();
-      // Span from the vertical center of the first thread card to the
-      // vertical center of the last — keeps the line "rooted" in the
-      // cards rather than dangling at their edges.
-      const top = firstRect.top - containerTop + firstRect.height / 2;
-      const bottom = lastRect.top - containerTop + lastRect.height / 2;
-      geoms.push({ rootId, top, height: Math.max(0, bottom - top) });
+    // Walk consecutive pairs of rendered cards (DOM order). If both
+    // belong to the same thread (root id matches), draw a segment in
+    // the gap between them. Unrelated card in between → no segment
+    // crosses it; the dotted line just isn't drawn there.
+    for (let i = 0; i < dayLogs.length - 1; i++) {
+      const a = dayLogs[i];
+      const b = dayLogs[i + 1];
+      const aRoot = getRootLogId(a);
+      const bRoot = getRootLogId(b);
+      if (aRoot !== bRoot) continue;
+      // Only draw if the thread actually has 2+ members across the
+      // whole log set. Defensive — same root on two day-adjacent
+      // logs already implies they're in a thread, but cheap check.
+      if (getThreadSize(a, allLogs) < 2) continue;
+      const aEl = cardRefs.current.get(a.id);
+      const bEl = cardRefs.current.get(b.id);
+      if (!aEl || !bEl) continue;
+      const aRect = aEl.getBoundingClientRect();
+      const bRect = bEl.getBoundingClientRect();
+      const top = aRect.bottom - containerTop;
+      const bottom = bRect.top - containerTop;
+      const height = bottom - top;
+      if (height <= 0) continue;
+      geoms.push({ key: `${a.id}->${b.id}`, top, height });
     }
-    setConnectors(geoms);
-    // dayLogs / allLogs structure changes drive re-measure.
+    setSegments(geoms);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayLogs, allLogs]);
 
   return (
     <div className="day-log-list" ref={containerRef}>
-      {connectors.map((c) => (
+      {segments.map((s) => (
         <span
-          key={c.rootId}
+          key={s.key}
           className="thread-connector"
           aria-hidden="true"
-          style={{ top: c.top, height: c.height }}
+          style={{ top: s.top, height: s.height }}
         />
       ))}
       {dayLogs.map((entry) => (
