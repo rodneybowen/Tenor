@@ -114,13 +114,37 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Set while we're tearing down SR + running detectEmotions. The
+  // stop button reads this and disables — same debounce as
+  // QuickLogScreen's tap-anywhere target so a panicked second tap
+  // can't re-enter the handler mid-extraction.
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Never disabled on first render. Becomes disable-able only after
+  // we've heard at least one result event from SR. Until then the
+  // user may want to back out cleanly.
+  const sawAnyResultRef = useRef(false);
+  if ((sr.transcript || sr.interim) && !sawAnyResultRef.current) {
+    sawAnyResultRef.current = true;
+  }
+  const stopDisabled = isProcessing && sawAnyResultRef.current;
+
   function handleStop() {
+    if (isProcessing) return;
+    setIsProcessing(true);
     clearDemo();
     setDemoActive(false);
     if (!demo) sr.stop();
     const text = transcriptRef.current.trim();
-    setChips(extractEmotions(text));
-    setPhase('review');
+    // extractEmotions is sync but we still wrap so the disabled state
+    // is visible for at least one frame and any future async work
+    // (e.g. swapping in an async classifier) doesn't need re-wiring.
+    try {
+      setChips(extractEmotions(text));
+      setPhase('review');
+    } finally {
+      setIsProcessing(false);
+    }
   }
 
   function handleRetry() {
@@ -218,6 +242,7 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
               className="stop-btn"
               aria-label="Stop and review"
               onClick={handleStop}
+              disabled={stopDisabled}
             >
               <Square size={26} weight="fill" />
             </button>
