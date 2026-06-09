@@ -30,6 +30,16 @@ export interface LogEntry {
    *  thread (root + children) after fetch so card rendering is a
    *  direct field read with no lookup. */
   topic?: string | null;
+  /** Which input flow produced this log. Drives the edit-window policy:
+   *  'quick' gets one edit regardless of age; everything else gets a
+   *  3-minute window from `ts` / `logged_at`. Optional in the type so
+   *  legacy mock rows without `source` keep working — they fall back
+   *  to 'speak' semantics. */
+  source?: 'speak' | 'type' | 'select' | 'quick';
+  /** Timestamp of the first chip edit (ISO string). NULL / undefined
+   *  until edited. `ts` stays immutable; this is provenance for the
+   *  edit gate (quick = one shot iff editedAt is null). */
+  editedAt?: string | null;
 }
 
 export interface WeekDay {
@@ -116,6 +126,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 1,
     mode: 'speak',
     keywords: ['grateful', 'calm'],
+    source: 'speak',
     quadrants: ['hep', 'lep'],
   },
   {
@@ -125,6 +136,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 1,
     mode: 'select',
     keywords: ['anxious', 'overwhelmed'],
+    source: 'select',
     quadrants: ['hen'],
   },
   {
@@ -134,6 +146,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 2,
     mode: 'speak',
     keywords: ['tired', 'drained'],
+    source: 'speak',
     quadrants: ['len'],
   },
   {
@@ -143,6 +156,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 1,
     mode: 'speak',
     keywords: ['frustrated', 'irritated'],
+    source: 'speak',
     quadrants: ['hen'],
   },
   {
@@ -152,6 +166,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 1,
     mode: 'select',
     keywords: ['hopeful', 'optimistic'],
+    source: 'select',
     quadrants: ['hep'],
   },
   {
@@ -161,6 +176,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 2,
     mode: 'speak',
     keywords: ['sad', 'lonely'],
+    source: 'speak',
     quadrants: ['len'],
   },
   {
@@ -170,6 +186,7 @@ export const MOCK_LOGS: LogEntry[] = [
     ts: 3,
     mode: 'select',
     keywords: ['content', 'relaxed'],
+    source: 'select',
     quadrants: ['lep'],
   },
 ];
@@ -259,6 +276,10 @@ function seedHistoricalLogs(): LogEntry[] {
         keywords: kws,
         quadrants: [q],
         chips: kws.map((k) => ({ text: k, quadrant: q })),
+        // Mode → source mapping for seed/mock logs so the edit gate
+        // can read `source` directly. Real inserts pass the right
+        // source at submission time.
+        source: mode === 'select' ? 'select' : mode === 'speak' ? 'speak' : 'type',
       });
     }
     cursor.setDate(cursor.getDate() + 1);

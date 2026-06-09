@@ -48,6 +48,7 @@ export function buildGuestSeed(): LogEntry[] {
       time: formatClock(morning),
       ts: morning.getTime(),
       mode: 'speak',
+      source: 'speak',
       keywords: ['excited', 'energized', 'hopeful'],
       quadrants: ['hep'],
       body: "Woke up actually looking forward to today — feels rare lately. Got a lot I want to get done.",
@@ -63,6 +64,7 @@ export function buildGuestSeed(): LogEntry[] {
       time: formatClock(noon),
       ts: noon.getTime(),
       mode: 'select',
+      source: 'select',
       keywords: ['calm', 'content', 'grounded'],
       quadrants: ['lep'],
       chips: [
@@ -77,6 +79,7 @@ export function buildGuestSeed(): LogEntry[] {
       time: formatClock(afternoon),
       ts: afternoon.getTime(),
       mode: 'speak',
+      source: 'speak',
       keywords: ['frustrated', 'overwhelmed', 'tense'],
       quadrants: ['hen'],
       body: "Two meetings landed back to back and I haven't eaten. Snapped at someone on Slack and now I feel bad about it.",
@@ -92,6 +95,7 @@ export function buildGuestSeed(): LogEntry[] {
       time: formatClock(evening),
       ts: evening.getTime(),
       mode: 'select',
+      source: 'select',
       keywords: ['tired', 'lonely', 'melancholy'],
       quadrants: ['len'],
       chips: [

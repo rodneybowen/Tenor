@@ -23,6 +23,7 @@ import {
   insertLog,
   dbLogToLogEntry,
   updateLogTopic,
+  updateLogChips,
 } from './lib/supabase';
 import { buildGuestSeed, loadGuestLogs, saveGuestLogs } from './lib/guestSeed';
 import {
@@ -215,6 +216,7 @@ export default function App() {
       try {
         const result = await insertLog({
           mode: 'speak',
+          source: 'speak',
           dateKey: TODAY_KEY,
           body: transcript,
           parentLogId: parentLogId ?? null,
@@ -235,6 +237,7 @@ export default function App() {
       time,
       ts: Date.now(),
       mode: 'speak',
+      source: 'speak',
       keywords: chips.map((c) => c.text),
       quadrants,
       body: transcript,
@@ -286,6 +289,7 @@ export default function App() {
       try {
         const result = await insertLog({
           mode: 'select',
+          source: 'select',
           dateKey: TODAY_KEY,
           body: emotionContext.trim() || null,
           parentLogId: parentLogId ?? null,
@@ -309,6 +313,7 @@ export default function App() {
       time,
       ts: Date.now(),
       mode: 'select',
+      source: 'select',
       keywords: emotionSelected.map((s) => s.name),
       quadrants,
       body: emotionContext.trim() || undefined,
@@ -404,6 +409,39 @@ export default function App() {
     } else {
       openLogDetail(logId, origin);
     }
+  }
+
+  /** Persist a chip edit to a log within its edit window. Writes to
+   *  Supabase first (when authenticated) so we can mirror the real
+   *  `edited_at` into state; on insert error or guest/mock mode we
+   *  fall back to a local-only update with a synthetic timestamp.
+   *  Throws on Supabase error so LogDetailScreen can surface the
+   *  message and keep the edit-mode UI open. */
+  async function saveLogChips(
+    logId: string,
+    chips: { text: string; quadrant: Quadrant | null }[],
+  ) {
+    const newQuadrants = Array.from(
+      new Set(chips.map((c) => c.quadrant).filter((q): q is Quadrant => q !== null)),
+    );
+    let editedAt = new Date().toISOString();
+    if (auth.state.status === 'authenticated') {
+      // Let the server be the source of truth for editedAt; rethrow so
+      // the screen can show the error and let the user retry.
+      editedAt = await updateLogChips(logId, chips);
+    }
+    setLogs((prev) =>
+      prev.map((l) => {
+        if (l.id !== logId) return l;
+        return {
+          ...l,
+          keywords: chips.map((c) => c.text),
+          quadrants: newQuadrants,
+          chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+          editedAt,
+        };
+      }),
+    );
   }
 
   /** Persist a topic to the root + mirror it onto every thread member
@@ -565,6 +603,7 @@ export default function App() {
               justSubmitted={detailOrigin === 'post-log'}
               onClose={closeLogDetail}
               onAddToLog={() => addToThisLog(log.id)}
+              onSaveChips={saveLogChips}
             />
           );
         })()}

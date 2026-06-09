@@ -73,6 +73,12 @@ export interface DbLog {
    *  standalone logs and on every child. The client denormalizes this
    *  onto every thread member in memory; see `lib/threads.ts`. */
   topic: string | null;
+  /** Input flow that produced this log. Drives the edit-window policy
+   *  (see `lib/editGate.ts`). NOT NULL in the DB with default 'speak'
+   *  so old rows pre-migration have a sane source. */
+  source: 'speak' | 'type' | 'select' | 'quick';
+  /** First / only chip-edit timestamp (ISO). NULL until edited. */
+  edited_at: string | null;
   created_at: string;
   deleted_at: string | null;
 }
@@ -301,6 +307,10 @@ export interface NewLogInput {
   /** Only meaningful on the root log of a thread. Children should leave
    *  this undefined — the topic lives on the root row. */
   topic?: string | null;
+  /** Input flow that produced this log — drives the edit-window policy.
+   *  Required at the type level so callers think about it; falls back
+   *  to 'speak' if a caller forgets (DB has the same default). */
+  source?: 'speak' | 'type' | 'select' | 'quick';
   chips: { text: string; quadrant: Quadrant | null }[];
 }
 
@@ -323,6 +333,7 @@ export async function insertLog(input: NewLogInput): Promise<LogWithChips> {
       body: input.body ?? null,
       parent_log_id: input.parentLogId ?? null,
       topic: input.topic ?? null,
+      source: input.source ?? 'speak',
     })
     .select()
     .single();
@@ -381,7 +392,54 @@ export function dbLogToLogEntry(db: LogWithChips): LogEntry {
     chips: db.chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
     parentLogId: db.parent_log_id,
     topic: db.topic,
+    source: db.source,
+    editedAt: db.edited_at,
   };
+}
+
+/** Replace the chips on a log and stamp `edited_at`. Used by the
+ *  3-minute edit window on LogDetailScreen (and by the one-shot quick-
+ *  log edit). The DB doesn't enforce the time / one-shot policy — the
+ *  client gates via `canEdit()`. We delete the existing log_chips rows
+ *  for this log and re-insert; chip ids change, sort_order is rebuilt
+ *  from the new array order.
+ *
+ *  Returns the new ISO timestamp on success so the caller can mirror
+ *  it into local state without a re-fetch. */
+export async function updateLogChips(
+  logId: string,
+  chips: { text: string; quadrant: Quadrant | null }[],
+): Promise<string> {
+  const sb = requireClient();
+  const editedAt = new Date().toISOString();
+
+  // Wipe + re-insert chip rows.
+  const { error: delErr } = await sb
+    .from('log_chips')
+    .delete()
+    .eq('log_id', logId);
+  if (delErr) throw delErr;
+
+  if (chips.length > 0) {
+    const rows = chips.map((c, i) => ({
+      log_id: logId,
+      text: c.text,
+      quadrant: c.quadrant,
+      sort_order: i,
+    }));
+    const { error: insErr } = await sb.from('log_chips').insert(rows);
+    if (insErr) throw insErr;
+  }
+
+  // Stamp the log so future canEdit() checks can short-circuit (esp.
+  // for quick logs where edited_at != null permanently locks edits).
+  const { error: upErr } = await sb
+    .from('logs')
+    .update({ edited_at: editedAt })
+    .eq('id', logId);
+  if (upErr) throw upErr;
+
+  return editedAt;
 }
 
 /** Update the topic on the ROOT log of a thread. Use this when the

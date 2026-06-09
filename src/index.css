@@ -2847,3 +2847,90 @@ button {
   color: #C80E0D;
   opacity: 0.85;
 }
+
+/* ════════════════════════════════════════════
+   LogDetailScreen — 3-minute edit window UI
+   ════════════════════════════════════════════ */
+
+/* Pencil sits to the LEFT of the × close button when both are visible
+   (view mode of an editable past log). Same circular-pill geometry. */
+.ld-edit-toggle {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  right: 64px; /* clears .ld-close at right: 16px + 40px width + 8px gap */
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1px solid rgba(34, 34, 34, 0.06);
+  box-shadow: 0 4px 14px rgba(34, 34, 34, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--charcoal);
+  z-index: 10;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.ld-edit-toggle:active { transform: scale(0.96); }
+.ld-edit-toggle:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+
+/* Edit-mode action bar: × cancel on the left of ✓ save, both on
+   the right side of the header. Replaces .ld-close + .ld-edit-toggle
+   while editing. */
+.ld-edit-bar {
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top, 0px));
+  right: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+.ld-edit-cancel,
+.ld-edit-save {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s, opacity 0.18s;
+}
+.ld-edit-cancel {
+  background: #ffffff;
+  border: 1px solid rgba(34, 34, 34, 0.12);
+  color: var(--charcoal);
+  box-shadow: 0 4px 14px rgba(34, 34, 34, 0.08);
+}
+.ld-edit-save {
+  background: var(--charcoal);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 14px rgba(34, 34, 34, 0.18);
+}
+.ld-edit-cancel:active,
+.ld-edit-save:active { transform: scale(0.96); }
+.ld-edit-cancel:disabled,
+.ld-edit-save:disabled { opacity: 0.5; cursor: default; }
+
+/* When editing, the chips section reuses the .chips layout from the
+   voice review screen — same look, same micro-interactions. The base
+   .chip / .chip--edit / .chip--add styles already live elsewhere in
+   this file. We only need a small layout override so the cluster
+   isn't stretched edge-to-edge inside the detail container. */
+.ld-chips--edit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ld-save-error {
+  margin: 8px 0 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: #b91c1c;
+}
