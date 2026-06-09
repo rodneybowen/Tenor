@@ -1836,8 +1836,11 @@ button {
 }
 .pnav__label {
   text-align: center;
-  font-family: var(--font-serif);
-  font-size: 18px;
+  /* Body font (Montserrat Regular 16px) — this is navigational info,
+     not a heading. Merriweather here read as a section title. */
+  font-family: var(--font-sans);
+  font-weight: 400;
+  font-size: 16px;
   color: var(--charcoal);
   letter-spacing: 0.02em;
 }

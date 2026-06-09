@@ -296,10 +296,42 @@ export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
   const innerW = W - padX * 2;
   const innerH = H - padY * 2;
 
-  // Points: x by chronological order index, y by primary quadrant's band.
-  const points = logs.map((l, i) => {
-    const q = (l.quadrants[0] ?? 'lep') as Quadrant;
-    const t = logs.length === 1 ? 0.5 : i / (logs.length - 1);
+  // Node granularity = unique emotion category in encounter order.
+  // A single log can yield 1–4 nodes — one per distinct quadrant
+  // appearing in its chips, in chip order, with duplicates dropped.
+  // Same rule for every input mode (speak/type orders chips by
+  // transcript position; emotion-selector orders by selection).
+  // If a log has no chips with quadrant tags, fall back to the
+  // precomputed `quadrants` array so the log still contributes
+  // at least one node and the line doesn't gap.
+  function quadrantsFor(log: LogEntry): Quadrant[] {
+    const seen = new Set<Quadrant>();
+    const seq: Quadrant[] = [];
+    const chips = log.chips ?? [];
+    for (const c of chips) {
+      const q = c.quadrant as Quadrant | null;
+      if (!q || seen.has(q)) continue;
+      seen.add(q);
+      seq.push(q);
+    }
+    if (seq.length > 0) return seq;
+    // Fallback for legacy / unchipped logs.
+    for (const q of log.quadrants) {
+      if (seen.has(q)) continue;
+      seen.add(q);
+      seq.push(q);
+    }
+    return seq;
+  }
+
+  // Flatten across logs in chronological order: log 1's nodes, then
+  // log 2's nodes, etc. X spaces uniformly across the total count.
+  const flat: Quadrant[] = [];
+  for (const l of logs) {
+    for (const q of quadrantsFor(l)) flat.push(q);
+  }
+  const points = flat.map((q, i) => {
+    const t = flat.length === 1 ? 0.5 : i / (flat.length - 1);
     return {
       x: padX + t * innerW,
       y: padY + BAND_Y[q] * innerH,
