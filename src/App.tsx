@@ -34,8 +34,6 @@ import {
 } from './lib/threads';
 import LogThreadScreen from './screens/LogThreadScreen';
 import TopicNamingPopup from './components/TopicNamingPopup';
-import QuickLogScreen from './screens/QuickLogScreen';
-import QuickLogReviewScreen from './screens/QuickLogReviewScreen';
 import {
   consumeQuickLogQueryParam,
   initQuickLogCallback,
@@ -45,8 +43,6 @@ type Screen =
   | 'home'
   | 'logMethod'
   | 'voice'
-  | 'quickLog'
-  | 'quickLogReview'
   | 'emotionGrid'
   | 'emotionReview'
   | 'logDetail'
@@ -192,16 +188,19 @@ export default function App() {
     'methods' | 'quadrants'
   >('methods');
 
-  // Id of the just-submitted quick log being reviewed. Resolved against
-  // `logs` at render time so a later state mutation (e.g. chip edit
-  // bumps editedAt) is reflected without re-routing.
-  const [quickLogReviewId, setQuickLogReviewId] = useState<string | null>(null);
-
-  // Enter the Quick Log capture flow. Triggered by:
-  //   • tenor://quick-log (iOS Shortcut) → initQuickLogCallback below
+  // Quick Log = the EXISTING voice flow ("Say it out loud." screen,
+  // live transcript, manual stop, chip review, confirm), just entered
+  // via a system shortcut and tagged `source: 'quick'` on submit so
+  // the 7-day edit window applies instead of the 3-minute one.
+  // Triggered by:
+  //   • Control Center tile / AppShortcut → native dispatches the
+  //     `tenor:quicklog` window event (see effect below)
+  //   • tenor://quick-log URL → initQuickLogCallback below
   //   • ?quicklog=1 on mount (web testing) → consumeQuickLogQueryParam
+  const quickEntryRef = useRef(false);
   function enterQuickLog() {
-    setScreen('quickLog');
+    quickEntryRef.current = true;
+    setScreen('voice');
   }
 
   // Initial mount: honor ?quicklog=1 once and replace the URL so a
@@ -254,13 +253,19 @@ export default function App() {
     const parentLogId = pendingParentLogId;
     setPendingParentLogId(null);
 
+    // Shortcut-entered voice logs are tagged 'quick' (7-day edit
+    // window); normal in-app voice logs stay 'speak' (3-minute).
+    // Consume the flag so the NEXT voice log isn't mis-tagged.
+    const source = quickEntryRef.current ? ('quick' as const) : ('speak' as const);
+    quickEntryRef.current = false;
+
     // Authenticated → write through Supabase, then mirror into local state
     // so the home week card refreshes immediately.
     if (auth.state.status === 'authenticated') {
       try {
         const result = await insertLog({
           mode: 'speak',
-          source: 'speak',
+          source,
           dateKey: TODAY_KEY,
           body: transcript,
           parentLogId: parentLogId ?? null,
@@ -281,7 +286,7 @@ export default function App() {
       time,
       ts: Date.now(),
       mode: 'speak',
-      source: 'speak',
+      source,
       keywords: chips.map((c) => c.text),
       quadrants,
       body: transcript,
@@ -455,51 +460,6 @@ export default function App() {
     }
   }
 
-  /** Build + persist the quick-log entry. Mirrors the submit paths
-   *  above but tagged `source: 'quick'` for the edit gate. Returns
-   *  the new LogEntry so QuickLogScreen can hand it straight to the
-   *  review screen. Throws on Supabase error (the screen handles the
-   *  fallback by sending the user home). */
-  async function submitQuickLog(args: {
-    transcript: string;
-    chips: { text: string; quadrant: Quadrant | null }[];
-  }): Promise<LogEntry> {
-    const now = new Date();
-    const quadrants = Array.from(
-      new Set(
-        args.chips.map((c) => c.quadrant).filter((q): q is Quadrant => q !== null),
-      ),
-    );
-
-    if (auth.state.status === 'authenticated') {
-      const result = await insertLog({
-        mode: 'speak',
-        source: 'quick',
-        dateKey: TODAY_KEY,
-        body: args.transcript,
-        chips: args.chips,
-      });
-      const entry = dbLogToLogEntry(result);
-      setLogs((prev) => [...prev, entry]);
-      return entry;
-    }
-
-    const entry: LogEntry = {
-      id: `q${Date.now()}`,
-      dateKey: TODAY_KEY,
-      time: formatClock(now),
-      ts: now.getTime(),
-      mode: 'speak',
-      source: 'quick',
-      keywords: args.chips.map((c) => c.text),
-      quadrants,
-      body: args.transcript,
-      chips: args.chips,
-    };
-    setLogs((prev) => [...prev, entry]);
-    return entry;
-  }
-
   /** Persist a chip edit to a log within its edit window. Writes to
    *  Supabase first (when authenticated) so we can mirror the real
    *  `edited_at` into state; on insert error or guest/mock mode we
@@ -655,33 +615,6 @@ export default function App() {
           onConfirm={submitVoiceLog}
         />
       )}
-
-      {screen === 'quickLog' && (
-        <QuickLogScreen
-          onSubmit={submitQuickLog}
-          onComplete={(entry) => {
-            setQuickLogReviewId(entry.id);
-            setScreen('quickLogReview');
-          }}
-          onCancel={() => setScreen('home')}
-        />
-      )}
-
-      {screen === 'quickLogReview' && quickLogReviewId &&
-        (() => {
-          const log = logs.find((l) => l.id === quickLogReviewId);
-          if (!log) return null;
-          return (
-            <QuickLogReviewScreen
-              log={log}
-              onSaveChips={saveLogChips}
-              onDone={() => {
-                setQuickLogReviewId(null);
-                setScreen('home');
-              }}
-            />
-          );
-        })()}
 
       {screen === 'emotionGrid' && (
         <EmotionGridScreen
