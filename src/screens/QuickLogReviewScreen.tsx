@@ -1,20 +1,24 @@
 // =====================================================================
-// QuickLogReviewScreen — post-quick-log review + one-shot edit
+// QuickLogReviewScreen — post-quick-log review + 7-day edit window
 // =====================================================================
 // Reached automatically after QuickLogScreen submits a `source: 'quick'`
 // log. The "Logged." header confirms the write happened in the
 // background while the user wasn't looking. Chips + transcript give
-// them the one chance to fix a mis-detection before the log locks.
+// them an opportunity to fix a mis-detection.
 //
 // Edit semantics mirror LogDetailScreen's chip-edit flow (Voice review
-// chip UX: tap rename, × remove, + add). Quick logs get exactly one
-// edit attempt: once `editedAt` is set, the button is gone forever.
+// chip UX: tap rename, × remove, + add). Quick logs have a 7-day edit
+// window from `logged_at` — the user wasn't watching the screen, so
+// they need a generous review path (e.g. during consecutive bad days
+// they may not feel up to triaging logs for several days). Editable
+// repeatedly within the window; the gate lives in `lib/editGate.ts`.
 // =====================================================================
 
 import { useState } from 'react';
 import { Check, CircleNotch, PencilSimple, Plus, X } from '@phosphor-icons/react';
 import { quadrantColor, type Quadrant } from '../theme/emotions';
 import { classify } from '../lib/emotionDetect';
+import { canEdit } from '../lib/editGate';
 import type { LogEntry } from '../data/mockLogs';
 
 interface ChipDraft {
@@ -53,10 +57,10 @@ function initialDraft(log: LogEntry): ChipDraft[] {
 }
 
 export default function QuickLogReviewScreen({ log, onSaveChips, onDone }: Props) {
-  // Quick logs get ONE edit, not time-gated. Show the CTA iff editedAt
-  // is null. After a save, editedAt mirrors in via App state and the
-  // button vanishes.
-  const oneShotAvailable = log.editedAt == null;
+  // 7-day window — CTA stays until the window closes. Save mirrors
+  // editedAt into App state but the user can still re-edit within
+  // the window.
+  const oneShotAvailable = canEdit(log);
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ChipDraft[]>([]);
