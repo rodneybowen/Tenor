@@ -213,6 +213,21 @@ export default function App() {
   }, []);
   useEffect(() => initQuickLogCallback(enterQuickLog), []);
 
+  // Native AppDelegate dispatches a window event when the app launches
+  // via the Quick Log Control Center tile / AppShortcut. We listen
+  // here and enter the capture flow. The event-based path is more
+  // reliable than the URL path on iOS 18 because `openAppWhenRun: true`
+  // brings the app forward but the system ignores `OpensIntent` in
+  // that case, so the URL never reaches Capacitor's appUrlOpen.
+  useEffect(() => {
+    function onTrigger() {
+      enterQuickLog();
+    }
+    window.addEventListener('tenor:quicklog', onTrigger);
+    return () => window.removeEventListener('tenor:quicklog', onTrigger);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Emotion-selector flow state
   const [entryQuadrant, setEntryQuadrant] = useState<Quadrant>('hep');
   const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
