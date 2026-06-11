@@ -109,10 +109,11 @@ export default function LogDetailScreen({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Show pencil only on a past-log view (not after a fresh submission),
-  // only when the gate allows, and only when we have a save handler.
-  const showPencil =
-    !justSubmitted && !editing && !!onSaveChips && canEdit(log);
+  // Show the pencil + timer whenever the edit window is open and we have
+  // a save handler — including the just-submitted confirmation screen
+  // (the most likely moment a user wants to fix a mis-detection). Hidden
+  // only while already in edit mode (the cancel/save bar replaces it).
+  const showPencil = !editing && !!onSaveChips && canEdit(log);
 
   function enterEdit() {
     setDraft(initialDraft(log));
