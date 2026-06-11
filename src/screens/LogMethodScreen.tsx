@@ -2,7 +2,6 @@ import { useEffect, useRef } from 'react';
 import {
   Microphone,
   PencilSimple,
-  Camera,
   CaretDown,
   CaretUp,
 } from '@phosphor-icons/react';
@@ -80,13 +79,6 @@ export default function LogMethodScreen({
                 <PencilSimple size={28} weight="light" />
               </span>
               <span className="i-label">Type</span>
-            </div>
-
-            <div className="input-bubble input-bubble--off" aria-disabled="true">
-              <span className="i-bubble">
-                <Camera size={28} weight="light" />
-              </span>
-              <span className="i-label">Scan</span>
             </div>
           </div>
 
