@@ -3078,3 +3078,10 @@ button {
 .qlr-edit-bar { display: flex; gap: 10px; }
 .qlr-edit-bar .btn-primary { flex: 2; }
 .qlr-edit-bar .btn-secondary { flex: 1; }
+
+/* ── Rotate-to-portrait gate (web/PWA) ──────────────────────────────
+   Web has no real way to force portrait orientation without an
+   overlay or the Screen Orientation API (fullscreen-only, not
+   available outside installed PWA). The 430px max-width app-root
+   already centers in landscape with empty space on the sides — we
+   just let it. Native iOS is portrait-locked via Info.plist. */
