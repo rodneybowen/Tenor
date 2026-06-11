@@ -165,60 +165,67 @@ export default function LogDetailScreen({
 
   return (
     <div className="screen" id="log-detail">
-      {/* Corner close only when the user is *viewing* a past log; after a
-          fresh submission the close action lives at the bottom as a
-          primary "back to home" button instead. */}
-      {!justSubmitted && !editing && (
-        <button
-          type="button"
-          className="ld-close"
-          aria-label="Close"
-          onClick={onClose}
-        >
-          <X size={20} weight="bold" />
-        </button>
-      )}
-
-      {showPencil && (
-        <>
-          <EditWindowTimer log={log} />
+      {/* One top-right corner row containing every header control.
+          Children flow right-to-left from the corner via `justify-content:
+          flex-end`, so whatever's present always hugs the right edge —
+          no hardcoded `right: 64px` offsets, no holes when the cross is
+          absent (just-submitted state) or when the timer hasn't ticked
+          past the window yet. Three render modes:
+            • viewing past log + edit window open: timer, pencil, ×
+            • just-submitted within edit window:  timer, pencil  (no ×)
+            • viewing past log, window expired:                  ×
+            • editing:                            (×) cancel, ✓ save  */}
+      <div className="ld-corner" role="group" aria-label="Log controls">
+        {!editing && showPencil && (
+          <>
+            <EditWindowTimer log={log} />
+            <button
+              type="button"
+              className="ld-corner-btn ld-corner-btn--icon"
+              aria-label="Edit emotions"
+              onClick={enterEdit}
+            >
+              <PencilSimple size={18} weight="regular" />
+            </button>
+          </>
+        )}
+        {!editing && !justSubmitted && (
           <button
             type="button"
-            className="ld-edit-toggle"
-            aria-label="Edit emotions"
-            onClick={enterEdit}
+            className="ld-corner-btn ld-corner-btn--icon"
+            aria-label="Close"
+            onClick={onClose}
           >
-            <PencilSimple size={18} weight="regular" />
+            <X size={20} weight="bold" />
           </button>
-        </>
-      )}
-
-      {editing && (
-        <div className="ld-edit-bar" role="group" aria-label="Edit controls">
-          <button
-            type="button"
-            className="ld-edit-cancel"
-            aria-label="Discard edits"
-            onClick={cancelEdit}
-            disabled={saving}
-          >
-            <X size={18} weight="bold" />
-          </button>
-          <button
-            type="button"
-            className="ld-edit-save"
-            aria-label="Save edits"
-            onClick={saveEdit}
-            disabled={saving}
-          >
-            {saving ? (
-              <CircleNotch size={18} weight="bold" className="spin" />
-            ) : (
-              <Check size={18} weight="bold" />
-            )}
-          </button>
-        </div>
-      )}
+        )}
+        {editing && (
+          <>
+            <button
+              type="button"
+              className="ld-corner-btn ld-corner-btn--icon"
+              aria-label="Discard edits"
+              onClick={cancelEdit}
+              disabled={saving}
+            >
+              <X size={18} weight="bold" />
+            </button>
+            <button
+              type="button"
+              className="ld-corner-btn ld-corner-btn--save"
+              aria-label="Save edits"
+              onClick={saveEdit}
+              disabled={saving}
+            >
+              {saving ? (
+                <CircleNotch size={18} weight="bold" className="spin" />
+              ) : (
+                <Check size={18} weight="bold" />
+              )}
+            </button>
+          </>
+        )}
+      </div>
 
       <div className="ld-body">
         <header className="ld-header">
