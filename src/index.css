@@ -2854,6 +2854,27 @@ button {
 
 /* Pencil sits to the LEFT of the × close button when both are visible
    (view mode of an editable past log). Same circular-pill geometry. */
+/* Edit-window countdown — pie + M:SS, sits to the left of the pencil.
+   Vertically centered against the 40px pencil button (timer ~20px tall
+   → +10px top offset). Right edge clears the pencil (right:64 + 40 + 8). */
+.edit-timer {
+  position: absolute;
+  top: calc(max(16px, env(safe-area-inset-top, 0px)) + 10px);
+  right: 112px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.edit-timer__text {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 13px;
+  color: var(--n-500);
+  font-variant-numeric: tabular-nums;
+}
+
 .ld-edit-toggle {
   position: absolute;
   top: max(16px, env(safe-area-inset-top, 0px));

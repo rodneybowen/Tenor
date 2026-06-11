@@ -12,6 +12,7 @@ import { type LogEntry } from '../data/mockLogs';
 import { quadrantColor, type Quadrant } from '../theme/emotions';
 import { classify } from '../lib/emotionDetect';
 import { canEdit } from '../lib/editGate';
+import EditWindowTimer from '../components/EditWindowTimer';
 
 interface ChipDraft {
   text: string;
@@ -178,14 +179,17 @@ export default function LogDetailScreen({
       )}
 
       {showPencil && (
-        <button
-          type="button"
-          className="ld-edit-toggle"
-          aria-label="Edit emotions"
-          onClick={enterEdit}
-        >
-          <PencilSimple size={18} weight="regular" />
-        </button>
+        <>
+          <EditWindowTimer log={log} />
+          <button
+            type="button"
+            className="ld-edit-toggle"
+            aria-label="Edit emotions"
+            onClick={enterEdit}
+          >
+            <PencilSimple size={18} weight="regular" />
+          </button>
+        </>
       )}
 
       {editing && (

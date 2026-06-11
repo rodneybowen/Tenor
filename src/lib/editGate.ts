@@ -35,10 +35,26 @@ export function canEdit(log: LogEntry, now: number = Date.now()): boolean {
   return now - log.ts < EDIT_WINDOW_MS;
 }
 
+/** The window length that applies to this log, in ms. Source-aware:
+ *  quick logs get the 7-day window, everything else 3 minutes. */
+export function editWindowMs(log: LogEntry): number {
+  return log.source === 'quick' ? QUICK_EDIT_WINDOW_MS : EDIT_WINDOW_MS;
+}
+
+/** Epoch ms at which the edit window closes. */
+export function editWindowEnd(log: LogEntry): number {
+  return log.ts + editWindowMs(log);
+}
+
+/** Milliseconds remaining in the edit window. 0 once expired. Used by
+ *  EditWindowTimer for the pie fraction (needs ms precision, not the
+ *  floored seconds `editSecondsRemaining` returns). */
+export function remainingEditMs(log: LogEntry, now: number = Date.now()): number {
+  return Math.max(0, editWindowEnd(log) - now);
+}
+
 /** Seconds remaining in the edit window — useful for a countdown
  *  indicator. Returns 0 once expired. */
 export function editSecondsRemaining(log: LogEntry, now: number = Date.now()): number {
-  const windowMs = log.source === 'quick' ? QUICK_EDIT_WINDOW_MS : EDIT_WINDOW_MS;
-  const ms = windowMs - (now - log.ts);
-  return Math.max(0, Math.floor(ms / 1000));
+  return Math.max(0, Math.floor(remainingEditMs(log, now) / 1000));
 }
