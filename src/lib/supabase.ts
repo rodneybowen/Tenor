@@ -53,7 +53,12 @@ export type LogMode = 'speak' | 'select' | 'type';
 export interface DbProfile {
   id: string;
   role: Role;
+  /** Denormalized "First Last" — kept in sync by updateName. Existing
+   *  reads (greeting fallback, mock paths) still work after the
+   *  first_name / last_name split (migration 0004). */
   display_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
   timezone: string | null;
   created_at: string;
   updated_at: string;
@@ -225,6 +230,32 @@ export async function updateDisplayName(
   const { data, error } = await sb
     .from('profiles')
     .update({ display_name: displayName.trim() })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbProfile;
+}
+
+/** Patch first/last separately + keep display_name in sync as the
+ *  concatenated "First Last" so every existing read site continues
+ *  to work. Empty last name is allowed (display_name == first_name). */
+export async function updateName(
+  userId: string,
+  firstName: string,
+  lastName: string,
+): Promise<DbProfile> {
+  const sb = requireClient();
+  const first = firstName.trim();
+  const last = lastName.trim();
+  const display = [first, last].filter(Boolean).join(' ');
+  const { data, error } = await sb
+    .from('profiles')
+    .update({
+      first_name: first || null,
+      last_name: last || null,
+      display_name: display || null,
+    })
     .eq('id', userId)
     .select()
     .single();
