@@ -217,7 +217,7 @@ export default function AccountScreen({
         </section>
 
         {/* ── Linked account (full-width pill + unlink) ── */}
-        <section className="acct-section">
+        <section className="acct-section acct-section--last">
           <span className="acct-label">Linked account</span>
           {googleLinked === null ? (
             <p className="acct-meta">Checking…</p>

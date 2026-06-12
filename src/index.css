@@ -2747,19 +2747,37 @@ button {
 }
 .acct-scroll::-webkit-scrollbar { display: none; }
 
+/* Spacing scale on the 4px grid. Pairs of related elements (label +
+   value) sit close; distinct sections breathe further apart. The
+   gap before the Sign Out CTA is the widest, so it reads as a
+   terminal action and not just another section. */
+.acct-scroll {
+  --space-tight: 8px;       /* label → value */
+  --space-snug: 12px;       /* edit-mode input row gap */
+  --space-section: 28px;    /* section → section */
+  --space-cta: 40px;        /* last section → Sign Out */
+  --space-title: 32px;      /* title → first section */
+}
+
 .acct-title {
   /* Inherits font-family / size from the h1 element rule
-     (Merriweather 36px). Left-aligned explicitly to defeat any
-     parent text-align inheritance. */
-  text-align: left;
-  margin: 0 0 28px;
+     (Merriweather 36px). Centered per the sketch — the rest of the
+     screen is left-aligned, but the role title sits visually above
+     it as a header. */
+  text-align: center;
+  margin: 0 0 var(--space-title);
 }
 
 .acct-section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 28px;
+  gap: var(--space-tight);
+  margin-bottom: var(--space-section);
+}
+/* Last section before the Sign Out CTA gets the wider rhythm so the
+   CTA reads as a terminal action. */
+.acct-section.acct-section--last {
+  margin-bottom: var(--space-cta);
 }
 .acct-label {
   font-family: var(--font-sans);
@@ -2853,9 +2871,12 @@ button {
 
 /* ── Sign out zone ── */
 .acct-signout-zone {
-  margin-top: 16px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(34, 34, 34, 0.1);
+  /* Spacing alone separates the CTA from the section above (see
+     .acct-section--last). No border-top — the rhythm carries the
+     hierarchy without an extra horizontal line. */
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
   display: flex;
 }
 .acct-signout {
@@ -2875,14 +2896,19 @@ button {
 /* ── Sketch-matched name + linked-account rows ── */
 .acct-name {
   /* Display-mode name as a plain h2 (tap to edit) — inherits font
-     family/size from the h2 element rule. */
-  margin-top: 2px;
+     family/size from the h2 element rule. Dashed underline signals
+     the row is editable, distinct from a plain serif heading. */
+  margin-top: 4px;
   cursor: pointer;
+  display: inline-block;
+  align-self: flex-start;
+  padding-bottom: 2px;
+  border-bottom: 1.5px dashed rgba(34, 34, 34, 0.4);
 }
 .acct-name-edit {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--space-snug);
 }
 .acct-name-edit .acct-input {
   width: 100%;
@@ -2890,7 +2916,8 @@ button {
 .acct-name-actions {
   grid-column: 1 / -1;
   display: flex;
-  gap: 8px;
+  gap: var(--space-snug);
+  margin-top: 4px;
 }
 .acct-name-actions .btn-secondary,
 .acct-name-actions .btn-primary {

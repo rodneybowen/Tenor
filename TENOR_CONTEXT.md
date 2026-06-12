@@ -714,14 +714,17 @@ Building in **React**, deployed to **GitHub Pages**. Mobile viewport, max-width 
 
 **AccountScreen.tsx fixes (current build has drifted from the original sketch — see "Detailed Flow: Account Tab" above for the as-built Jun 4 spec):**
 
-1. **"Patient Account" H1 is centered — should be left-aligned**, per the sketch (matches the rest of the screen's left-aligned text).
+1. ~~"Patient Account" H1 is centered — should be left-aligned~~ — **reverted (Jun 12 2026): "Patient Account" H1 should actually be CENTER-aligned.** Previous instruction to left-align was wrong; center it.
 2. **Name field — split into first/last name, but display as one:**
    - DB: `profiles` table should store `first_name` and `last_name` as separate columns (add if not present; currently a single `display_name`).
    - Edit mode: two separate editable fields — "First Name" and "Last Name".
    - Display mode (not editing): render as a single cohesive name "First Last" (H2), not two separate fields/boxes.
    - Everywhere else the user's name appears (home screen greeting, etc.): show **only the first name**.
-3. **Linked account row** — the "google account linked" pill (secondary button) and the unlink "X" button should flex to fill the full width of the section (not pill-sized with leftover space), with appropriate spacing/alignment and padding between the two elements.
-4. **Sign Out button** — same full-width flex treatment as #3, filling the section width.
+   - **Known bug from latest build:** the name currently renders as "Rohan Rohan" — `last_name` appears to have been populated from the same source as `first_name` (likely both defaulted from the old single `display_name` value during migration/seed). Fix the data so `last_name` holds the actual last name ("Boda", per the original sketch), not a duplicate of `first_name`.
+   - **New: the displayed name (display mode) should be underlined**, to signal it's tappable/editable.
+3. **Linked account row** — the "google account linked" pill (secondary button) and the unlink "X" button should flex to fill the full width of the section (not pill-sized with leftover space), with appropriate spacing/alignment and padding between the two elements. *(Done per latest screenshot — looks correct, no further change needed.)*
+4. **Sign Out button** — same full-width flex treatment as #3. *(Done per latest screenshot — looks correct, no further change needed.)*
+5. **New: spacing system.** The latest build uses one flat, uniform gap between every section (heading → name → linked account → divider → sign out), which reads as monotonous/wrong. Replace with a deliberate spacing scale on the 4px grid — e.g. small gap (8–12px) between tightly-related elements (a label and its value), larger gap (24–32px) between distinct sections (name block → linked account block → sign out). Spacing should increase with the "distance" between groups, not be one constant value throughout.
 
 These are layout/data-model fixes to bring the existing built screen back in line with the original sketch — not new features.
 
