@@ -708,38 +708,22 @@ Building in **React**, deployed to **GitHub Pages**. Mobile viewport, max-width 
 
 **Variant-selection rule (locked Jun 12 2026):** small footprint + light background → small dark logo; small footprint + dark background → small light logo; generous footprint → one of the full-wordmark variants. The color-gradient `t logo.svg` is reserved for surfaces where the background is unknown or mixed (e.g. browser tabs).
 
-### NEXT UP (added Jun 12 2026, revised Jun 12 2026) — Heading typography preset selector: "non-cursive" vs "cursive"
+### NEXT UP (added Jun 12 2026, revised again) — Revert heading-font experiment; fix AccountScreen layout vs. sketch
 
-**Correction (Jun 12 2026, final — confirmed against reference image v3):** simpler than earlier drafts. **No size changes between presets.** The "cursive" preset swaps the font for H1, H2, H3, **and Label** to **Vibur** (Google Font), all at their existing sizes. Body stays Montserrat Regular 16px in both presets.
+**Heading-style selector: ABANDONED.** Do not build the "non-cursive"/"cursive" preset toggle, do not add Vibur, do not add the "App Settings" section. Revert anything already built for this: remove the `data-heading-style` attribute/CSS variables and the Vibur Google Fonts import if either was added, and remove the "App Settings" section + two-tile selector from `AccountScreen.tsx` if it was added. Fonts go back to the original single set — **Merriweather** for H1/H2/H3, **Montserrat** for Body/Label (Regular for Body, Light for Label) — matching the existing "Design System → Typography" table (no changes needed to that table).
 
-**Goal:** Accounts screen gets a heading-style selector with two presets, "non-cursive" and "cursive":
+**AccountScreen.tsx fixes (current build has drifted from the original sketch — see "Detailed Flow: Account Tab" above for the as-built Jun 4 spec):**
 
-| Role | non-cursive (current) | cursive (new) |
-|---|---|---|
-| Heading 1 | Merriweather Regular 36px | **Vibur Regular 36px** |
-| Heading 2 | Merriweather Regular 24px | **Vibur Regular 24px** |
-| Heading 3 | Merriweather Regular 18px | **Vibur Regular 18px** |
-| Body | Montserrat Regular 16px | unchanged |
-| Label | Montserrat Light 16px | **Vibur Regular 16px** |
+1. **"Patient Account" H1 is centered — should be left-aligned**, per the sketch (matches the rest of the screen's left-aligned text).
+2. **Name field — split into first/last name, but display as one:**
+   - DB: `profiles` table should store `first_name` and `last_name` as separate columns (add if not present; currently a single `display_name`).
+   - Edit mode: two separate editable fields — "First Name" and "Last Name".
+   - Display mode (not editing): render as a single cohesive name "First Last" (H2), not two separate fields/boxes.
+   - Everywhere else the user's name appears (home screen greeting, etc.): show **only the first name**.
+3. **Linked account row** — the "google account linked" pill (secondary button) and the unlink "X" button should flex to fill the full width of the section (not pill-sized with leftover space), with appropriate spacing/alignment and padding between the two elements.
+4. **Sign Out button** — same full-width flex treatment as #3, filling the section width.
 
-**Default for new/unset state = cursive.**
-
-**Font source (assumption — confirm with user if it looks wrong):** Vibur is a standard Google Font (cursive category). Add it to the existing Google Fonts `<link>` in `index.html` (same CDN already serving Merriweather/Montserrat), e.g. append `&family=Vibur&display=swap`. (The previously-uploaded `Sacramento-Regular.ttf` is no longer needed for this spec — Sacramento has been superseded by Vibur.)
-
-**Implementation:**
-1. Implement as two named presets via a `data-heading-style="non-cursive" | "cursive"` attribute on `<html>` or `<body>`, with a CSS variable per role (`--font-h1`, `--font-h2`, `--font-h3`, `--font-label`) that switches between `'Merriweather', Georgia, serif` / `'Montserrat', sans-serif` (non-cursive) and `'Vibur', cursive` (cursive). Sizes are unchanged — only `font-family` (and `font-weight` → Regular for Label, since Vibur likely doesn't have a Light weight) switches.
-2. State: in-memory is consistent with current prototype scope (per `CLAUDE.md` — no backend). If `profiles` table already exists (it does, per Account Tab build), consider a `heading_style` column for persistence across sessions — note as optional/stretch.
-3. Vibur is a handwriting-style script font — double-check line-height/vertical clipping isn't an issue at existing sizes (36/24/18/16px), and re-check WCAG contrast (script faces read lighter than serif/sans at the same color).
-4. Update the "Design System → Typography" table (below) to show both presets side by side, matching the table above.
-
-**AccountScreen.tsx layout addition (per sketch):**
-- New **"App Settings"** section (H1 heading), placed below a divider, after the existing account info / Google-link / Sign Out area.
-- Inside it: a two-tile font selector. Two square preview tiles side by side, each rendering "Aa" styled in that preset's Heading 1 style, captioned **"non-cursive"** and **"cursive"** respectively. Tapping a tile applies that preset app-wide.
-- Other elements visible in the sketch for reference (should already exist per the Jun 4 Account Tab build — confirm match, don't rebuild): "Patient Account" (H1) → NAME label / "Rohan Boda" (H2) → "LINKED ACCOUNT" label / Google-linked pill as secondary button with an unlink "X" → "Sign Out" as primary button with icon → divider → new "App Settings" section described above.
-
-**Explicitly out of scope for this pass:** the un-skippable sign-up onboarding popup (reminder time + font choice) — that depends on this selector existing AND on the notifications system, neither of which exist yet. Queue separately once both are done.
-
-**Do this first**, ahead of everything else queued below. Real logo assets now exist and need to be wired in.
+These are layout/data-model fixes to bring the existing built screen back in line with the original sketch — not new features.
 
 **Source files** (absolute path, not in either app repo — copy/reference from here):
 `/Users/rohanboda/Desktop/Health tech map/Tenor/design assets/`

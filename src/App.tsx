@@ -79,17 +79,6 @@ export default function App() {
   const isGuest = auth.state.status === 'guest';
 
   const [screen, setScreen] = useState<Screen>('home');
-
-  // Heading typography preset. Default = cursive (Sacramento across
-  // H1/H2/H3). In-memory only for now — selector lives in the Account
-  // screen's "App Settings" section. Reflects on <html data-heading-style>
-  // so the CSS variable preset block in index.css takes over.
-  const [headingStyle, setHeadingStyle] = useState<
-    'non-cursive' | 'cursive'
-  >('cursive');
-  useEffect(() => {
-    document.documentElement.setAttribute('data-heading-style', headingStyle);
-  }, [headingStyle]);
   // Initial logs state precedence:
   //   guest      → restore from sessionStorage if present, otherwise
   //                seed 4 yesterday logs and start fresh
@@ -593,7 +582,13 @@ export default function App() {
           logs={logs}
           displayName={
             auth.state.status === 'authenticated'
-              ? auth.state.profile.display_name
+              ? // First name only in the greeting — full name is reserved
+                // for the Account screen. Fall back to splitting
+                // display_name for accounts created before the
+                // first_name / last_name migration backfilled.
+                (auth.state.profile.first_name ??
+                  auth.state.profile.display_name?.trim().split(/\s+/)[0] ??
+                  null)
               : isGuest
               ? null  // explicit "no name" → greeting renders without a name
               : undefined  // dev/mock → falls back to 'Rohan'
@@ -694,8 +689,6 @@ export default function App() {
       {screen === 'account' && auth.state.status === 'authenticated' && (
         <AccountScreen
           profile={auth.state.profile}
-          headingStyle={headingStyle}
-          onHeadingStyleChange={setHeadingStyle}
           onProfileUpdated={(next) => auth.applyProfile(next)}
           onSignedOut={() => {
             // Drop all in-memory log state so the next sign-in starts

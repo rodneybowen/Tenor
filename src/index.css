@@ -46,49 +46,8 @@
   --r-pill: 50px;
   --r-card: 24px;
 
+  --font-serif: 'Merriweather', Georgia, serif;
   --font-sans: 'Montserrat', system-ui, sans-serif;
-  --font-script: 'Vibur', 'Snell Roundhand', cursive;
-  /* `--font-serif` is overridden per heading-style preset below — the
-     default here is the non-cursive fallback for any environment that
-     somehow strips the [data-heading-style] attribute. */
-  --font-serif: 'Merriweather', Georgia, serif;
-}
-
-/* Heading typography presets. Default = cursive (Vibur). Toggled via
-   `data-heading-style` on <html> from AccountScreen's App Settings.
-
-   Key trick: we redefine `--font-serif` itself inside each preset so
-   every bespoke heading class in the codebase (`.acct-title`,
-   `.greeting`, `.voice-title`, etc., all of which read
-   `font-family: var(--font-serif)`) flips automatically — without
-   touching their selectors one-by-one. Sizes stay identical across
-   presets per the design spec. */
-:root,
-:root[data-heading-style='cursive'] {
-  --font-serif: 'Vibur', 'Snell Roundhand', cursive;
-  --font-h1: var(--font-serif);
-  --font-h2: var(--font-serif);
-  --font-h3: var(--font-serif);
-  --font-label: 'Vibur', 'Snell Roundhand', cursive;
-  --weight-label: 400;
-  --size-h1: 36px;
-  --size-h2: 24px;
-  --size-h3: 18px;
-  /* Vibur sits a touch higher than Merriweather at the same px — small
-     line-height bump avoids ascender clipping inside tight pills. */
-  --lh-heading: 1.25;
-}
-:root[data-heading-style='non-cursive'] {
-  --font-serif: 'Merriweather', Georgia, serif;
-  --font-h1: var(--font-serif);
-  --font-h2: var(--font-serif);
-  --font-h3: var(--font-serif);
-  --font-label: var(--font-sans);
-  --weight-label: 300;
-  --size-h1: 36px;
-  --size-h2: 24px;
-  --size-h3: 18px;
-  --lh-heading: 1.2;
 }
 
 * {
@@ -130,14 +89,15 @@ body {
    bespoke headings (.greeting, .voice-title, etc.) keep their
    custom styling — they were authored before these rules existed. */
 h1, h2, h3 {
+  font-family: var(--font-serif);
   font-weight: 400;
   margin: 0;
   color: var(--charcoal);
-  line-height: var(--lh-heading);
+  line-height: 1.2;
 }
-h1 { font-family: var(--font-h1); font-size: var(--size-h1); }
-h2 { font-family: var(--font-h2); font-size: var(--size-h2); }
-h3 { font-family: var(--font-h3); font-size: var(--size-h3); }
+h1 { font-size: 36px; }
+h2 { font-size: 24px; }
+h3 { font-size: 18px; }
 
 button {
   font-family: var(--font-sans);
@@ -2788,10 +2748,10 @@ button {
 .acct-scroll::-webkit-scrollbar { display: none; }
 
 .acct-title {
-  font-family: var(--font-serif);
-  font-weight: 400;
-  font-size: 32px;
-  color: var(--charcoal);
+  /* Inherits font-family / size from the h1 element rule
+     (Merriweather 36px). Left-aligned explicitly to defeat any
+     parent text-align inheritance. */
+  text-align: left;
   margin: 0 0 28px;
 }
 
@@ -2802,8 +2762,8 @@ button {
   margin-bottom: 28px;
 }
 .acct-label {
-  font-family: var(--font-label);
-  font-weight: var(--weight-label);
+  font-family: var(--font-sans);
+  font-weight: 300;
   font-size: 13px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2914,22 +2874,43 @@ button {
 
 /* ── Sketch-matched name + linked-account rows ── */
 .acct-name {
-  /* Display name as a plain h2 (no inline edit) — matches sketch.
-     Inherits family/size from the h2 element rule, which means it
-     flips between Merriweather and Vibur with the heading-style
-     preset automatically. */
+  /* Display-mode name as a plain h2 (tap to edit) — inherits font
+     family/size from the h2 element rule. */
   margin-top: 2px;
+  cursor: pointer;
 }
+.acct-name-edit {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.acct-name-edit .acct-input {
+  width: 100%;
+}
+.acct-name-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+.acct-name-actions .btn-secondary,
+.acct-name-actions .btn-primary {
+  flex: 1;
+}
+
+/* Linked-account row: pill + unlink X flex to fill the full section
+   width. The pill grows; the X stays a fixed circle on the right. */
 .acct-linked-row {
   display: flex;
   align-items: center;
   gap: 10px;
 }
 .acct-linked-pill {
+  flex: 1;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 10px 16px;
+  padding: 12px 18px;
   border: 1.5px solid rgba(34, 34, 34, 0.22);
   border-radius: var(--r-pill);
   font-family: var(--font-sans);
@@ -2938,8 +2919,8 @@ button {
   background: rgba(255, 255, 255, 0.6);
 }
 .acct-unlink {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2950,63 +2931,6 @@ button {
   flex: 0 0 auto;
 }
 .acct-unlink:disabled { opacity: 0.5; cursor: default; }
-
-/* ── App Settings: heading style preset selector ── */
-.acct-divider {
-  margin: 28px 0 20px;
-  border: none;
-  border-top: 1px solid rgba(34, 34, 34, 0.12);
-}
-.acct-app-settings h1 {
-  margin-bottom: 16px;
-}
-.heading-style-tiles {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-top: 10px;
-}
-.heading-style-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: 18px 12px 14px;
-  aspect-ratio: 1 / 1;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1.5px solid rgba(34, 34, 34, 0.18);
-  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
-}
-.heading-style-tile.is-selected {
-  border-color: var(--charcoal);
-  box-shadow: 0 0 0 1px var(--charcoal) inset;
-}
-.heading-style-preview {
-  display: block;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--charcoal);
-  line-height: 1;
-}
-.heading-style-preview[data-heading-style='non-cursive'] {
-  font-family: 'Merriweather', Georgia, serif;
-  font-size: 64px;
-}
-.heading-style-preview[data-heading-style='cursive'] {
-  font-family: var(--font-script);
-  font-size: 88px;
-}
-.heading-style-caption {
-  font-family: var(--font-sans);
-  font-weight: 300;
-  font-size: 14px;
-  color: var(--charcoal);
-  opacity: 0.85;
-}
 
 /* ════════════════════════════════════════════
    LogDetailScreen — 3-minute edit window UI
