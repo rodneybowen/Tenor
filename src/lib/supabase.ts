@@ -48,7 +48,7 @@ export const supabase: SupabaseClient | null = supabaseEnabled
 // ----- DB row shapes (mirror the migration) ------------------------------
 
 export type Role = 'patient' | 'therapist';
-export type LogMode = 'speak' | 'select' | 'type' | 'scan';
+export type LogMode = 'speak' | 'select' | 'type';
 
 export interface DbProfile {
   id: string;

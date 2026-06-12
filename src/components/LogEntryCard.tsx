@@ -1,18 +1,16 @@
-import { Microphone, PencilSimple, Camera, SquaresFour, Clock } from '@phosphor-icons/react';
+import { Microphone, PencilSimple, SquaresFour, Clock } from '@phosphor-icons/react';
 import type { LogEntry } from '../data/mockLogs';
 import { blendGradient, type LogMode } from '../theme/emotions';
 
 const MODE_ICON: Record<LogMode, typeof Microphone> = {
   speak: Microphone,
   type: PencilSimple,
-  scan: Camera,
   select: SquaresFour,
 };
 
 const MODE_LABEL: Record<LogMode, string> = {
   speak: 'Voice note',
   type: 'Written',
-  scan: 'Scanned',
   select: 'Emotion picker',
 };
 

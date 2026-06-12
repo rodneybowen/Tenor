@@ -4,7 +4,7 @@
 
 export type Quadrant = 'hep' | 'lep' | 'hen' | 'len';
 
-export type LogMode = 'speak' | 'type' | 'scan' | 'select';
+export type LogMode = 'speak' | 'type' | 'select';
 
 /** A single picked emotion in the emotion-selector flow. */
 export interface EmotionSelection {
