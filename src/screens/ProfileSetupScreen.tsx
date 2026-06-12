@@ -49,7 +49,7 @@ export default function ProfileSetupScreen({ userId, email, onComplete }: Props)
   return (
     <div className="screen" id="auth">
       <div className="auth-shell">
-        <h1 className="auth-wordmark">Tenor</h1>
+        <h1 className="auth-wordmark"><img src={`${import.meta.env.BASE_URL}full-logo-dark.svg`} alt="Tenor" /></h1>
 
         <div className="auth-card">
           <h2 className="auth-card__title">Welcome to Tenor</h2>

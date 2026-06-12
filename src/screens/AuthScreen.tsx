@@ -81,7 +81,7 @@ export default function AuthScreen({ onContinueAsGuest }: AuthScreenProps) {
     return (
       <div className="screen" id="auth">
         <div className="auth-shell">
-          <h1 className="auth-wordmark">Tenor</h1>
+          <h1 className="auth-wordmark"><img src={`${import.meta.env.BASE_URL}full-logo-dark.svg`} alt="Tenor" /></h1>
           <div className="auth-card">
             <h2 className="auth-card__title">Check your email</h2>
             <p className="auth-card__sub">
@@ -107,7 +107,7 @@ export default function AuthScreen({ onContinueAsGuest }: AuthScreenProps) {
   return (
     <div className="screen" id="auth">
       <div className="auth-shell">
-        <h1 className="auth-wordmark">Tenor</h1>
+        <h1 className="auth-wordmark"><img src={`${import.meta.env.BASE_URL}full-logo-dark.svg`} alt="Tenor" /></h1>
 
         <div className="auth-card">
           <div className="auth-tabs" role="tablist">

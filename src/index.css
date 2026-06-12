@@ -2115,13 +2115,14 @@ button {
    auth screens only (the main app suppresses the wordmark entirely
    because the home greeting carries brand presence on its own). */
 .auth-wordmark {
-  font-family: var(--font-serif);
-  font-size: 36px;
-  font-weight: 400;
-  line-height: 1;
-  color: var(--charcoal);
   margin: 8px 0 28px;
   text-align: center;
+  line-height: 1;
+}
+.auth-wordmark img {
+  display: inline-block;
+  height: 40px;
+  width: auto;
 }
 .auth-card {
   width: 100%;
