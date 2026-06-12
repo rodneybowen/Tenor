@@ -28,6 +28,33 @@
   </head>
   <body>
     <div id="root"></div>
-<script type="module" src="/src/main.tsx"></script>
+    <!-- Last-resort visible error sink. Catches module-load or other
+         pre-React failures inside the iOS WebView, where Xcode's
+         console doesn't surface JS errors. If anything fires here the
+         user gets a readable message on screen instead of a blank
+         white page. Removed automatically once React mounts and
+         renders into #root. -->
+    <script>
+      (function () {
+        function paint(label, msg) {
+          try {
+            var root = document.getElementById('root');
+            if (!root) return;
+            root.innerHTML =
+              '<pre style="white-space:pre-wrap;word-break:break-word;' +
+              'padding:24px 18px;margin:0;font:13px ui-monospace,Menlo,monospace;' +
+              'color:#222;background:#fff;min-height:100vh;">' +
+              '[' + label + '] ' + String(msg) + '</pre>';
+          } catch (_) {}
+        }
+        window.addEventListener('error', function (e) {
+          paint('error', (e.error && e.error.stack) || e.message);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          paint('promise', (e.reason && (e.reason.stack || e.reason.message)) || e.reason);
+        });
+      })();
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

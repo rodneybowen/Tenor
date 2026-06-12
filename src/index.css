@@ -95,7 +95,9 @@ h1, h2, h3 {
   color: var(--charcoal);
   line-height: 1.2;
 }
-h1 { font-size: 36px; }
+/* H1 ships at Light (300) to match the home-screen .greeting that
+   set the brand precedent. H2/H3 stay at Regular (400). */
+h1 { font-size: 36px; font-weight: 300; }
 h2 { font-size: 24px; }
 h3 { font-size: 18px; }
 

@@ -514,17 +514,17 @@ Sourced from the user's published Google Sheet (CSV-pulled). If vocabulary list 
 
 ### Typography
 
-Two heading presets, swapped app-wide via `<html data-heading-style>`. Default = **cursive**. Selector lives in Account → App Settings. Both presets share the same sizes — only font-family changes. Body stays Montserrat across both.
+**Reverted Jun 12 2026:** the two-preset "non-cursive"/"cursive" system (Vibur, `data-heading-style`, App Settings selector) was built then abandoned — see CHANGELOG. Back to a single type set:
 
-| Role | non-cursive | cursive (default) |
-|---|---|---|
-| Heading 1 | Merriweather Regular 36px | Vibur Regular 36px |
-| Heading 2 | Merriweather Regular 24px | Vibur Regular 24px |
-| Heading 3 | Merriweather Regular 18px | Vibur Regular 18px |
-| Body | Montserrat Regular 16px | Montserrat Regular 16px |
-| Label | Montserrat Light 16px | Vibur Regular 16px |
+| Role | Font | Weight | Size |
+|---|---|---|---|
+| Heading 1 | Merriweather | **Light** | 36px |
+| Heading 2 | Merriweather | Regular | 24px |
+| Heading 3 | Merriweather | Regular | 18px |
+| Body | Montserrat | Regular | 16px |
+| Label | Montserrat | Light | 16px |
 
-Implemented as CSS variables on `:root[data-heading-style='non-cursive' | 'cursive']`. **Key trick:** each preset *redefines `--font-serif` itself* — so every bespoke heading class in the codebase (`.acct-title`, `.greeting`, `.voice-title`, …, all of which read `var(--font-serif)`) flips automatically with the preset, without touching their selectors one-by-one. Bare `h1/h2/h3` element rules read `--font-h{1,2,3}` (which also chain through `--font-serif`). Label classes (`.acct-label`, etc.) read `--font-label` + `--weight-label`, which swap to Vibur 400 in cursive and Montserrat 300 in non-cursive. Vibur ships from the existing Google Fonts `<link>` in `index.html`.
+**Decision (Jun 12 2026):** the home screen's `.greeting` (Heading 1, `font-weight: 300`/Light) is the canonical H1 look — apply it everywhere. Update the bare `h1` element rule's `font-weight` from `400` to `300` so every H1 (including `.acct-title` on Accounts) matches `.greeting`. H2/H3 stay Regular (400) — only H1 weight changes. `--font-serif` (`'Merriweather', Georgia, serif`) and `--font-sans` (`'Montserrat', system-ui, sans-serif`) remain the only two heading/body font variables.
 
 Not Material 3's default Roboto — these are Tenor's brand fonts.
 

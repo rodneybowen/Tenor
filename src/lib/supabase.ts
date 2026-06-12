@@ -182,11 +182,12 @@ export async function signInWithGoogle(): Promise<void> {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: {
-      // Return to wherever the app is currently running. Works in dev
-      // (localhost:5175) and production (github.io/Tenor) without code
-      // changes — make sure both URLs are whitelisted in Supabase →
-      // Authentication → URL Configuration.
-      redirectTo: window.location.href,
+      // Return to the app's clean origin + path. Stripping any
+      // existing `#fragment` / `?query` prevents Supabase from stacking
+      // its own `#access_token=…` on top of a residual hash left by a
+      // previous failed attempt (which would otherwise produce a
+      // double-`#` URL the client can't parse).
+      redirectTo: window.location.origin + window.location.pathname,
     },
   });
   if (error) throw error;
@@ -282,7 +283,9 @@ export async function linkGoogleIdentity(): Promise<void> {
   const sb = requireClient();
   const { error } = await sb.auth.linkIdentity({
     provider: 'google',
-    options: { redirectTo: window.location.href },
+    // Same clean-URL rule as signInWithGoogle — strip any stray
+     // `#fragment` / `?query` so Supabase doesn't double-stack hashes.
+    options: { redirectTo: window.location.origin + window.location.pathname },
   });
   if (error) throw error;
 }
