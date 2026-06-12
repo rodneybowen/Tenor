@@ -11,7 +11,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Make the WKWebView transparent and tint the window cream so
         // that with contentInset: 'never' + viewport-fit=cover, any
         // safe-area gap below the webview shows neutral aurora-adjacent
-        // color, not default white. Inner DOM scroll is untouched.
+        // color, not default white.
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.tintWebViewBackdrop()
         }
@@ -36,38 +36,67 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return nil
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
-    }
-
-    func applicationDidEnterBackground(_ application: UIApplication) {
-        // Use this method to release shared resources, save user data, invalidate timers, and store enough application state information to restore your application to its current state in case it is terminated later.
-        // If your application supports background execution, this method is called instead of applicationWillTerminate: when the user quits.
-    }
-
-    func applicationWillEnterForeground(_ application: UIApplication) {
-        // Called as part of the transition from the background to the active state; here you can undo many of the changes made on entering the background.
-    }
+    func applicationWillResignActive(_ application: UIApplication) {}
+    func applicationDidEnterBackground(_ application: UIApplication) {}
+    func applicationWillEnterForeground(_ application: UIApplication) {}
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        // When the app comes to foreground (cold launch via Quick Log
+        // tile OR resumed from background), check the App Group flag
+        // that the tile's AppIntent writes. If set, dispatch a window
+        // event into the WKWebView so App.tsx routes to QuickLogScreen.
+        if #available(iOS 18.0, *) {
+            checkQuickLogFlag()
+        }
     }
 
-    func applicationWillTerminate(_ application: UIApplication) {
-        // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
+    func applicationWillTerminate(_ application: UIApplication) {}
+
+    @available(iOS 18.0, *)
+    private func checkQuickLogFlag() {
+        let defaults = UserDefaults(suiteName: TenorAppGroup.suiteName)
+        guard defaults?.bool(forKey: TenorAppGroup.shouldStartQuickLogKey) == true else {
+            return
+        }
+        // Consume the flag so a future "normal" open doesn't re-trigger.
+        defaults?.set(false, forKey: TenorAppGroup.shouldStartQuickLogKey)
+        print("[QuickLog] flag detected — dispatching JS event")
+
+        // Wait a tick for the WKWebView to finish loading. Capacitor's
+        // initial JS load can take 100–300ms on a cold launch; firing
+        // the event too early means App.tsx hasn't registered its
+        // listener yet. 600ms gives a comfortable margin without
+        // feeling laggy. If the listener IS already attached (warm
+        // resume), the event fires nearly immediately anyway.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+            self?.dispatchQuickLogEvent()
+        }
+    }
+
+    private func dispatchQuickLogEvent() {
+        guard let root = self.window?.rootViewController else {
+            print("[QuickLog] no rootViewController, cannot dispatch")
+            return
+        }
+        guard let webView = findWebView(in: root.view) else {
+            print("[QuickLog] no WKWebView found, cannot dispatch")
+            return
+        }
+        let js = "window.dispatchEvent(new CustomEvent('tenor:quicklog'))"
+        webView.evaluateJavaScript(js) { _, error in
+            if let error = error {
+                print("[QuickLog] JS dispatch error: \(error.localizedDescription)")
+            } else {
+                print("[QuickLog] JS event dispatched")
+            }
+        }
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        // Called when the app was launched with an activity, including Universal Links.
-        // Feel free to add additional processing here, but if you want the App API to support
-        // tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
