@@ -48,6 +48,32 @@
 
   --font-serif: 'Merriweather', Georgia, serif;
   --font-sans: 'Montserrat', system-ui, sans-serif;
+  --font-script: 'Sacramento', 'Snell Roundhand', cursive;
+}
+
+/* Heading typography presets. Default = cursive (Sacramento for all
+   three heading levels). The Account screen's App Settings tile
+   selector flips data-heading-style on <html> in-memory. */
+:root,
+:root[data-heading-style='cursive'] {
+  --font-h1: var(--font-script);
+  --font-h2: var(--font-script);
+  --font-h3: var(--font-script);
+  --size-h1: 56px;
+  --size-h2: 44px;
+  --size-h3: 32px;
+  /* Sacramento has deep ascenders/descenders — give script headings
+     more vertical room than the Merriweather equivalents. */
+  --lh-heading: 1.15;
+}
+:root[data-heading-style='non-cursive'] {
+  --font-h1: var(--font-serif);
+  --font-h2: var(--font-serif);
+  --font-h3: var(--font-serif);
+  --size-h1: 36px;
+  --size-h2: 24px;
+  --size-h3: 18px;
+  --lh-heading: 1.2;
 }
 
 * {
@@ -89,15 +115,14 @@ body {
    bespoke headings (.greeting, .voice-title, etc.) keep their
    custom styling — they were authored before these rules existed. */
 h1, h2, h3 {
-  font-family: var(--font-serif);
   font-weight: 400;
   margin: 0;
   color: var(--charcoal);
-  line-height: 1.2;
+  line-height: var(--lh-heading);
 }
-h1 { font-size: 36px; }
-h2 { font-size: 24px; }
-h3 { font-size: 18px; }
+h1 { font-family: var(--font-h1); font-size: var(--size-h1); }
+h2 { font-family: var(--font-h2); font-size: var(--size-h2); }
+h3 { font-family: var(--font-h3); font-size: var(--size-h3); }
 
 button {
   font-family: var(--font-sans);
@@ -2869,6 +2894,63 @@ button {
   font-family: var(--font-sans);
   font-size: 12px;
   color: #C80E0D;
+  opacity: 0.85;
+}
+
+/* ── App Settings: heading style preset selector ── */
+.acct-divider {
+  margin: 28px 0 20px;
+  border: none;
+  border-top: 1px solid rgba(34, 34, 34, 0.12);
+}
+.acct-app-settings h1 {
+  margin-bottom: 16px;
+}
+.heading-style-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 10px;
+}
+.heading-style-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 18px 12px 14px;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid rgba(34, 34, 34, 0.18);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+.heading-style-tile.is-selected {
+  border-color: var(--charcoal);
+  box-shadow: 0 0 0 1px var(--charcoal) inset;
+}
+.heading-style-preview {
+  display: block;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--charcoal);
+  line-height: 1;
+}
+.heading-style-preview[data-heading-style='non-cursive'] {
+  font-family: var(--font-serif);
+  font-size: 56px;
+}
+.heading-style-preview[data-heading-style='cursive'] {
+  font-family: var(--font-script);
+  font-size: 72px;
+}
+.heading-style-caption {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 14px;
+  color: var(--charcoal);
   opacity: 0.85;
 }
 

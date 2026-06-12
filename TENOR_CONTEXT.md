@@ -513,13 +513,18 @@ Sourced from the user's published Google Sheet (CSV-pulled). If vocabulary list 
 ## Design System
 
 ### Typography
-| Role | Font | Weight | Size |
-|---|---|---|---|
-| Heading 1 | Merriweather | Regular | 36px |
-| Heading 2 | Merriweather | Regular | 24px |
-| Heading 3 | Merriweather | Regular | 18px |
-| Body | Montserrat | Regular | 16px |
-| Label | Montserrat | Light | 16px |
+
+Two heading presets, swapped app-wide via `<html data-heading-style>`. Default = **cursive**. Selector lives in Account → App Settings. Body/Label are identical across both presets.
+
+| Role | non-cursive | cursive (default) |
+|---|---|---|
+| Heading 1 | Merriweather Regular 36px | Sacramento Regular 56px |
+| Heading 2 | Merriweather Regular 24px | Sacramento Regular 44px |
+| Heading 3 | Merriweather Regular 18px | Sacramento Regular 32px |
+| Body | Montserrat Regular 16px | Montserrat Regular 16px |
+| Label | Montserrat Light 16px | Montserrat Light 16px |
+
+Implemented as CSS variables on `:root[data-heading-style='non-cursive' | 'cursive']` → `--font-h{1,2,3}` + `--size-h{1,2,3}` + `--lh-heading` (1.2 non-cursive, 1.15 cursive — Sacramento has deep ascenders/descenders). Element rules `h1/h2/h3` read those vars; bespoke headings using `var(--font-serif)` directly are intentionally untouched. Sacramento ships from the existing Google Fonts `<link>` in `index.html`.
 
 Not Material 3's default Roboto — these are Tenor's brand fonts.
 
@@ -702,6 +707,37 @@ Building in **React**, deployed to **GitHub Pages**. Mobile viewport, max-width 
 - **Skipped:** `TenorControls` widget iconset (placeholder `Contents.json` with no filename refs — separate cleanup before it can hold images).
 
 **Variant-selection rule (locked Jun 12 2026):** small footprint + light background → small dark logo; small footprint + dark background → small light logo; generous footprint → one of the full-wordmark variants. The color-gradient `t logo.svg` is reserved for surfaces where the background is unknown or mixed (e.g. browser tabs).
+
+### NEXT UP (added Jun 12 2026, revised Jun 12 2026) — Heading typography preset selector: "non-cursive" vs "cursive"
+
+**Correction (Jun 12 2026, confirmed against reference image):** this is a **full heading-typography preset swap**, not a single font-family variable. In the "cursive" preset, **all three headings (H1, H2, H3) switch to Sacramento** AND change size. Body and Label are unchanged in both presets.
+
+**Goal:** Accounts screen gets a heading-style selector with two presets, "non-cursive" and "cursive":
+
+| Role | non-cursive (current) | cursive (new) |
+|---|---|---|
+| Heading 1 | Merriweather Regular 36px | **Sacramento Regular 56px** |
+| Heading 2 | Merriweather Regular 24px | **Sacramento Regular 44px** |
+| Heading 3 | Merriweather Regular 18px | **Sacramento Regular 32px** |
+| Body | Montserrat Regular 16px | unchanged |
+| Label | Montserrat Light 16px | unchanged |
+
+**Default for new/unset state = cursive.**
+
+**Font source (assumption — confirm with user if it looks wrong):** Sacramento is a standard Google Font. Add it to the existing Google Fonts `<link>` in `index.html` (same CDN already serving Merriweather/Montserrat), e.g. append `&family=Sacramento&display=swap`. The user separately uploaded a `Sacramento-Regular.ttf` — if the CDN render doesn't match what they expect, fall back to self-hosting that file via `@font-face` instead (file isn't in the repo yet; user would need to provide it).
+
+**Implementation:**
+1. Implement as two named presets, not a single variable swap. Suggested approach: a `data-heading-style="non-cursive" | "cursive"` attribute on `<html>` or `<body>`, with CSS variables per preset (`--font-h1`, `--size-h1`, `--font-h2`, `--size-h2`, `--font-h3`, `--size-h3`). Update every `h1`/`h2`/`h3` currently on `var(--font-serif)` to use these new variables.
+2. State: in-memory is consistent with current prototype scope (per `CLAUDE.md` — no backend). If `profiles` table already exists (it does, per Account Tab build), consider a `heading_style` column for persistence across sessions — note as optional/stretch.
+3. Sacramento is a script font with deep ascenders/descenders — at 56px double-check line-height doesn't clip, and re-check WCAG contrast at whatever weight/size lands (script faces read lighter than serif at the same color).
+4. Update the "Design System → Typography" table (below) to show both presets side by side, matching the table above.
+
+**AccountScreen.tsx layout addition (per sketch):**
+- New **"App Settings"** section (H1 heading), placed below a divider, after the existing account info / Google-link / Sign Out area.
+- Inside it: a two-tile font selector. Two square preview tiles side by side, each rendering "Aa" styled in that preset's Heading 1 style, captioned **"non-cursive"** and **"cursive"** respectively. Tapping a tile applies that preset app-wide.
+- Other elements visible in the sketch for reference (should already exist per the Jun 4 Account Tab build — confirm match, don't rebuild): "Patient Account" (H1) → NAME label / "Rohan Boda" (H2) → "LINKED ACCOUNT" label / Google-linked pill as secondary button with an unlink "X" → "Sign Out" as primary button with icon → divider → new "App Settings" section described above.
+
+**Explicitly out of scope for this pass:** the un-skippable sign-up onboarding popup (reminder time + font choice) — that depends on this selector existing AND on the notifications system, neither of which exist yet. Queue separately once both are done.
 
 **Do this first**, ahead of everything else queued below. Real logo assets now exist and need to be wired in.
 

@@ -8,10 +8,17 @@ import {
   type DbProfile,
 } from '../lib/supabase';
 
+type HeadingStyle = 'non-cursive' | 'cursive';
+
 interface Props {
   /** Current authenticated profile. Required — the Account tab is
    *  hidden for guest users at the routing level. */
   profile: DbProfile;
+  /** Current app-wide heading typography preset. Driven from App.tsx
+   *  via a data attribute on <html>. */
+  headingStyle: HeadingStyle;
+  /** Apply a new heading preset app-wide. In-memory for now. */
+  onHeadingStyleChange: (next: HeadingStyle) => void;
   /** Mirror the latest profile back into App state so the home greeting
    *  refreshes the moment a display-name save completes. */
   onProfileUpdated: (next: DbProfile) => void;
@@ -27,6 +34,8 @@ const ROLE_LABEL: Record<DbProfile['role'], string> = {
 
 export default function AccountScreen({
   profile,
+  headingStyle,
+  onHeadingStyleChange,
   onProfileUpdated,
   onSignedOut,
 }: Props) {
@@ -187,6 +196,37 @@ export default function AccountScreen({
             sign out
           </button>
         </div>
+
+        {/* ── App Settings ─────────────────────────────── */}
+        <hr className="acct-divider" />
+        <section className="acct-section acct-app-settings">
+          <h1>App Settings</h1>
+          <span className="acct-label">Heading style</span>
+          <div className="heading-style-tiles" role="radiogroup" aria-label="Heading style">
+            {(['non-cursive', 'cursive'] as const).map((preset) => {
+              const selected = headingStyle === preset;
+              return (
+                <button
+                  key={preset}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  className={`heading-style-tile${selected ? ' is-selected' : ''}`}
+                  onClick={() => onHeadingStyleChange(preset)}
+                >
+                  <span
+                    className="heading-style-preview"
+                    data-heading-style={preset}
+                    aria-hidden="true"
+                  >
+                    Aa
+                  </span>
+                  <span className="heading-style-caption">{preset}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
       </div>
     </div>
   );

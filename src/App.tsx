@@ -79,6 +79,17 @@ export default function App() {
   const isGuest = auth.state.status === 'guest';
 
   const [screen, setScreen] = useState<Screen>('home');
+
+  // Heading typography preset. Default = cursive (Sacramento across
+  // H1/H2/H3). In-memory only for now — selector lives in the Account
+  // screen's "App Settings" section. Reflects on <html data-heading-style>
+  // so the CSS variable preset block in index.css takes over.
+  const [headingStyle, setHeadingStyle] = useState<
+    'non-cursive' | 'cursive'
+  >('cursive');
+  useEffect(() => {
+    document.documentElement.setAttribute('data-heading-style', headingStyle);
+  }, [headingStyle]);
   // Initial logs state precedence:
   //   guest      → restore from sessionStorage if present, otherwise
   //                seed 4 yesterday logs and start fresh
@@ -683,6 +694,8 @@ export default function App() {
       {screen === 'account' && auth.state.status === 'authenticated' && (
         <AccountScreen
           profile={auth.state.profile}
+          headingStyle={headingStyle}
+          onHeadingStyleChange={setHeadingStyle}
           onProfileUpdated={(next) => auth.applyProfile(next)}
           onSignedOut={() => {
             // Drop all in-memory log state so the next sign-in starts
