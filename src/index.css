@@ -46,30 +46,45 @@
   --r-pill: 50px;
   --r-card: 24px;
 
-  --font-serif: 'Merriweather', Georgia, serif;
   --font-sans: 'Montserrat', system-ui, sans-serif;
-  --font-script: 'Sacramento', 'Snell Roundhand', cursive;
+  --font-script: 'Vibur', 'Snell Roundhand', cursive;
+  /* `--font-serif` is overridden per heading-style preset below — the
+     default here is the non-cursive fallback for any environment that
+     somehow strips the [data-heading-style] attribute. */
+  --font-serif: 'Merriweather', Georgia, serif;
 }
 
-/* Heading typography presets. Default = cursive (Sacramento for all
-   three heading levels). The Account screen's App Settings tile
-   selector flips data-heading-style on <html> in-memory. */
+/* Heading typography presets. Default = cursive (Vibur). Toggled via
+   `data-heading-style` on <html> from AccountScreen's App Settings.
+
+   Key trick: we redefine `--font-serif` itself inside each preset so
+   every bespoke heading class in the codebase (`.acct-title`,
+   `.greeting`, `.voice-title`, etc., all of which read
+   `font-family: var(--font-serif)`) flips automatically — without
+   touching their selectors one-by-one. Sizes stay identical across
+   presets per the design spec. */
 :root,
 :root[data-heading-style='cursive'] {
-  --font-h1: var(--font-script);
-  --font-h2: var(--font-script);
-  --font-h3: var(--font-script);
-  --size-h1: 56px;
-  --size-h2: 44px;
-  --size-h3: 32px;
-  /* Sacramento has deep ascenders/descenders — give script headings
-     more vertical room than the Merriweather equivalents. */
-  --lh-heading: 1.15;
-}
-:root[data-heading-style='non-cursive'] {
+  --font-serif: 'Vibur', 'Snell Roundhand', cursive;
   --font-h1: var(--font-serif);
   --font-h2: var(--font-serif);
   --font-h3: var(--font-serif);
+  --font-label: 'Vibur', 'Snell Roundhand', cursive;
+  --weight-label: 400;
+  --size-h1: 36px;
+  --size-h2: 24px;
+  --size-h3: 18px;
+  /* Vibur sits a touch higher than Merriweather at the same px — small
+     line-height bump avoids ascender clipping inside tight pills. */
+  --lh-heading: 1.25;
+}
+:root[data-heading-style='non-cursive'] {
+  --font-serif: 'Merriweather', Georgia, serif;
+  --font-h1: var(--font-serif);
+  --font-h2: var(--font-serif);
+  --font-h3: var(--font-serif);
+  --font-label: var(--font-sans);
+  --weight-label: 300;
   --size-h1: 36px;
   --size-h2: 24px;
   --size-h3: 18px;
@@ -2787,8 +2802,8 @@ button {
   margin-bottom: 28px;
 }
 .acct-label {
-  font-family: var(--font-sans);
-  font-weight: 300;
+  font-family: var(--font-label);
+  font-weight: var(--weight-label);
   font-size: 13px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -2897,6 +2912,45 @@ button {
   opacity: 0.85;
 }
 
+/* ── Sketch-matched name + linked-account rows ── */
+.acct-name {
+  /* Display name as a plain h2 (no inline edit) — matches sketch.
+     Inherits family/size from the h2 element rule, which means it
+     flips between Merriweather and Vibur with the heading-style
+     preset automatically. */
+  margin-top: 2px;
+}
+.acct-linked-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.acct-linked-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1.5px solid rgba(34, 34, 34, 0.22);
+  border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--charcoal);
+  background: rgba(255, 255, 255, 0.6);
+}
+.acct-unlink {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid rgba(34, 34, 34, 0.22);
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--charcoal);
+  flex: 0 0 auto;
+}
+.acct-unlink:disabled { opacity: 0.5; cursor: default; }
+
 /* ── App Settings: heading style preset selector ── */
 .acct-divider {
   margin: 28px 0 20px;
@@ -2939,12 +2993,12 @@ button {
   line-height: 1;
 }
 .heading-style-preview[data-heading-style='non-cursive'] {
-  font-family: var(--font-serif);
-  font-size: 56px;
+  font-family: 'Merriweather', Georgia, serif;
+  font-size: 64px;
 }
 .heading-style-preview[data-heading-style='cursive'] {
   font-family: var(--font-script);
-  font-size: 72px;
+  font-size: 88px;
 }
 .heading-style-caption {
   font-family: var(--font-sans);

@@ -1,10 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { GoogleLogo, SignOut, CircleNotch, Check } from '@phosphor-icons/react';
+import { useEffect, useState } from 'react';
+import { GoogleLogo, SignOut, X, CircleNotch } from '@phosphor-icons/react';
 import {
   hasGoogleIdentity,
   linkGoogleIdentity,
   signOut,
-  updateDisplayName,
+  supabase,
   type DbProfile,
 } from '../lib/supabase';
 
@@ -19,38 +19,33 @@ interface Props {
   headingStyle: HeadingStyle;
   /** Apply a new heading preset app-wide. In-memory for now. */
   onHeadingStyleChange: (next: HeadingStyle) => void;
-  /** Mirror the latest profile back into App state so the home greeting
-   *  refreshes the moment a display-name save completes. */
+  /** Mirror the latest profile back into App state — kept for API
+   *  parity even though this revision of the screen no longer edits
+   *  the display name inline. */
   onProfileUpdated: (next: DbProfile) => void;
   /** Called after a successful sign out so the caller can clear app
    *  state and route back to the auth screen. */
   onSignedOut: () => void;
 }
 
-const ROLE_LABEL: Record<DbProfile['role'], string> = {
-  patient: 'Patient',
-  therapist: 'Therapist',
+const ROLE_TITLE: Record<DbProfile['role'], string> = {
+  patient: 'Patient Account',
+  therapist: 'Therapist Account',
 };
 
 export default function AccountScreen({
   profile,
   headingStyle,
   onHeadingStyleChange,
-  onProfileUpdated,
   onSignedOut,
 }: Props) {
-  const [name, setName] = useState<string>(profile.display_name ?? '');
-  const [savingName, setSavingName] = useState(false);
-  const [nameError, setNameError] = useState<string | null>(null);
-
   const [googleLinked, setGoogleLinked] = useState<boolean | null>(null);
   const [linkingGoogle, setLinkingGoogle] = useState(false);
+  const [unlinkingGoogle, setUnlinkingGoogle] = useState(false);
   const [linkError, setLinkError] = useState<string | null>(null);
 
   const [signingOut, setSigningOut] = useState(false);
 
-  // Resolve once on mount: whether the user already has a Google
-  // identity. Drives the "Link Google account" CTA visibility.
   useEffect(() => {
     let alive = true;
     hasGoogleIdentity()
@@ -65,34 +60,39 @@ export default function AccountScreen({
     };
   }, []);
 
-  const dirty = name.trim().length > 0 && name.trim() !== profile.display_name;
-
-  async function saveName(e?: FormEvent) {
-    e?.preventDefault();
-    if (!dirty || savingName) return;
-    setSavingName(true);
-    setNameError(null);
-    try {
-      const next = await updateDisplayName(profile.id, name.trim());
-      onProfileUpdated(next);
-      setName(next.display_name ?? '');
-    } catch (err) {
-      setNameError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setSavingName(false);
-    }
-  }
-
   async function linkGoogle() {
     setLinkingGoogle(true);
     setLinkError(null);
     try {
       await linkGoogleIdentity();
-      // The OAuth redirect leaves the page; control won't return here
-      // unless Supabase errored before redirecting.
     } catch (err) {
       setLinkError(err instanceof Error ? err.message : String(err));
       setLinkingGoogle(false);
+    }
+  }
+
+  async function unlinkGoogle() {
+    if (!supabase || unlinkingGoogle) return;
+    setUnlinkingGoogle(true);
+    setLinkError(null);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const google = (user?.identities ?? []).find(
+        (i) => i.provider === 'google',
+      );
+      if (!google) {
+        setGoogleLinked(false);
+        return;
+      }
+      const { error } = await supabase.auth.unlinkIdentity(google);
+      if (error) throw error;
+      setGoogleLinked(false);
+    } catch (err) {
+      setLinkError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setUnlinkingGoogle(false);
     }
   }
 
@@ -108,60 +108,44 @@ export default function AccountScreen({
     }
   }
 
+  const displayName = profile.display_name?.trim() || 'You';
+
   return (
     <div className="screen" id="account">
       <div className="acct-scroll">
-        <h1 className="acct-title">Account</h1>
+        <h1 className="acct-title">{ROLE_TITLE[profile.role]}</h1>
 
-        {/* ── Display name ─────────────────────────────── */}
+        {/* ── Name ─────────────────────────────────────── */}
         <section className="acct-section">
-          <label className="acct-label" htmlFor="acct-name">
-            Display name
-          </label>
-          <form className="acct-name-row" onSubmit={saveName}>
-            <input
-              id="acct-name"
-              type="text"
-              className="acct-input"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={60}
-              aria-label="Display name"
-            />
-            {dirty && (
-              <button
-                type="submit"
-                className="acct-save"
-                disabled={savingName || name.trim().length === 0}
-                aria-label="Save display name"
-              >
-                {savingName ? (
-                  <CircleNotch size={16} weight="bold" className="spin" />
-                ) : (
-                  <Check size={16} weight="bold" />
-                )}
-              </button>
-            )}
-          </form>
-          {nameError && <p className="acct-error">{nameError}</p>}
+          <span className="acct-label">Name</span>
+          <h2 className="acct-name">{displayName}</h2>
         </section>
 
-        {/* ── Account type (read-only) ─────────────────── */}
+        {/* ── Linked account ───────────────────────────── */}
         <section className="acct-section">
-          <span className="acct-label">Account type</span>
-          <span className="acct-pill">{ROLE_LABEL[profile.role]}</span>
-        </section>
-
-        {/* ── Linked accounts ─────────────────────────── */}
-        <section className="acct-section">
-          <span className="acct-label">Linked accounts</span>
+          <span className="acct-label">Linked account</span>
           {googleLinked === null ? (
             <p className="acct-meta">Checking…</p>
           ) : googleLinked ? (
-            <span className="acct-linked">
-              <GoogleLogo size={16} weight="bold" />
-              Google account linked
-            </span>
+            <div className="acct-linked-row">
+              <span className="btn-secondary acct-linked-pill">
+                <GoogleLogo size={16} weight="bold" />
+                google account linked
+              </span>
+              <button
+                type="button"
+                className="acct-unlink"
+                onClick={unlinkGoogle}
+                disabled={unlinkingGoogle}
+                aria-label="Unlink Google account"
+              >
+                {unlinkingGoogle ? (
+                  <CircleNotch size={14} weight="bold" className="spin" />
+                ) : (
+                  <X size={14} weight="bold" />
+                )}
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -180,7 +164,7 @@ export default function AccountScreen({
           {linkError && <p className="acct-error">{linkError}</p>}
         </section>
 
-        {/* ── Sign out ─────────────────────────────────── */}
+        {/* ── Sign out (primary CTA) ───────────────────── */}
         <div className="acct-signout-zone">
           <button
             type="button"
@@ -193,7 +177,7 @@ export default function AccountScreen({
             ) : (
               <SignOut size={16} weight="bold" />
             )}
-            sign out
+            Sign Out
           </button>
         </div>
 
@@ -202,7 +186,11 @@ export default function AccountScreen({
         <section className="acct-section acct-app-settings">
           <h1>App Settings</h1>
           <span className="acct-label">Heading style</span>
-          <div className="heading-style-tiles" role="radiogroup" aria-label="Heading style">
+          <div
+            className="heading-style-tiles"
+            role="radiogroup"
+            aria-label="Heading style"
+          >
             {(['non-cursive', 'cursive'] as const).map((preset) => {
               const selected = headingStyle === preset;
               return (

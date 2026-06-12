@@ -514,17 +514,17 @@ Sourced from the user's published Google Sheet (CSV-pulled). If vocabulary list 
 
 ### Typography
 
-Two heading presets, swapped app-wide via `<html data-heading-style>`. Default = **cursive**. Selector lives in Account → App Settings. Body/Label are identical across both presets.
+Two heading presets, swapped app-wide via `<html data-heading-style>`. Default = **cursive**. Selector lives in Account → App Settings. Both presets share the same sizes — only font-family changes. Body stays Montserrat across both.
 
 | Role | non-cursive | cursive (default) |
 |---|---|---|
-| Heading 1 | Merriweather Regular 36px | Sacramento Regular 56px |
-| Heading 2 | Merriweather Regular 24px | Sacramento Regular 44px |
-| Heading 3 | Merriweather Regular 18px | Sacramento Regular 32px |
+| Heading 1 | Merriweather Regular 36px | Vibur Regular 36px |
+| Heading 2 | Merriweather Regular 24px | Vibur Regular 24px |
+| Heading 3 | Merriweather Regular 18px | Vibur Regular 18px |
 | Body | Montserrat Regular 16px | Montserrat Regular 16px |
-| Label | Montserrat Light 16px | Montserrat Light 16px |
+| Label | Montserrat Light 16px | Vibur Regular 16px |
 
-Implemented as CSS variables on `:root[data-heading-style='non-cursive' | 'cursive']` → `--font-h{1,2,3}` + `--size-h{1,2,3}` + `--lh-heading` (1.2 non-cursive, 1.15 cursive — Sacramento has deep ascenders/descenders). Element rules `h1/h2/h3` read those vars; bespoke headings using `var(--font-serif)` directly are intentionally untouched. Sacramento ships from the existing Google Fonts `<link>` in `index.html`.
+Implemented as CSS variables on `:root[data-heading-style='non-cursive' | 'cursive']`. **Key trick:** each preset *redefines `--font-serif` itself* — so every bespoke heading class in the codebase (`.acct-title`, `.greeting`, `.voice-title`, …, all of which read `var(--font-serif)`) flips automatically with the preset, without touching their selectors one-by-one. Bare `h1/h2/h3` element rules read `--font-h{1,2,3}` (which also chain through `--font-serif`). Label classes (`.acct-label`, etc.) read `--font-label` + `--weight-label`, which swap to Vibur 400 in cursive and Montserrat 300 in non-cursive. Vibur ships from the existing Google Fonts `<link>` in `index.html`.
 
 Not Material 3's default Roboto — these are Tenor's brand fonts.
 
@@ -710,26 +710,26 @@ Building in **React**, deployed to **GitHub Pages**. Mobile viewport, max-width 
 
 ### NEXT UP (added Jun 12 2026, revised Jun 12 2026) — Heading typography preset selector: "non-cursive" vs "cursive"
 
-**Correction (Jun 12 2026, confirmed against reference image):** this is a **full heading-typography preset swap**, not a single font-family variable. In the "cursive" preset, **all three headings (H1, H2, H3) switch to Sacramento** AND change size. Body and Label are unchanged in both presets.
+**Correction (Jun 12 2026, final — confirmed against reference image v3):** simpler than earlier drafts. **No size changes between presets.** The "cursive" preset swaps the font for H1, H2, H3, **and Label** to **Vibur** (Google Font), all at their existing sizes. Body stays Montserrat Regular 16px in both presets.
 
 **Goal:** Accounts screen gets a heading-style selector with two presets, "non-cursive" and "cursive":
 
 | Role | non-cursive (current) | cursive (new) |
 |---|---|---|
-| Heading 1 | Merriweather Regular 36px | **Sacramento Regular 56px** |
-| Heading 2 | Merriweather Regular 24px | **Sacramento Regular 44px** |
-| Heading 3 | Merriweather Regular 18px | **Sacramento Regular 32px** |
+| Heading 1 | Merriweather Regular 36px | **Vibur Regular 36px** |
+| Heading 2 | Merriweather Regular 24px | **Vibur Regular 24px** |
+| Heading 3 | Merriweather Regular 18px | **Vibur Regular 18px** |
 | Body | Montserrat Regular 16px | unchanged |
-| Label | Montserrat Light 16px | unchanged |
+| Label | Montserrat Light 16px | **Vibur Regular 16px** |
 
 **Default for new/unset state = cursive.**
 
-**Font source (assumption — confirm with user if it looks wrong):** Sacramento is a standard Google Font. Add it to the existing Google Fonts `<link>` in `index.html` (same CDN already serving Merriweather/Montserrat), e.g. append `&family=Sacramento&display=swap`. The user separately uploaded a `Sacramento-Regular.ttf` — if the CDN render doesn't match what they expect, fall back to self-hosting that file via `@font-face` instead (file isn't in the repo yet; user would need to provide it).
+**Font source (assumption — confirm with user if it looks wrong):** Vibur is a standard Google Font (cursive category). Add it to the existing Google Fonts `<link>` in `index.html` (same CDN already serving Merriweather/Montserrat), e.g. append `&family=Vibur&display=swap`. (The previously-uploaded `Sacramento-Regular.ttf` is no longer needed for this spec — Sacramento has been superseded by Vibur.)
 
 **Implementation:**
-1. Implement as two named presets, not a single variable swap. Suggested approach: a `data-heading-style="non-cursive" | "cursive"` attribute on `<html>` or `<body>`, with CSS variables per preset (`--font-h1`, `--size-h1`, `--font-h2`, `--size-h2`, `--font-h3`, `--size-h3`). Update every `h1`/`h2`/`h3` currently on `var(--font-serif)` to use these new variables.
+1. Implement as two named presets via a `data-heading-style="non-cursive" | "cursive"` attribute on `<html>` or `<body>`, with a CSS variable per role (`--font-h1`, `--font-h2`, `--font-h3`, `--font-label`) that switches between `'Merriweather', Georgia, serif` / `'Montserrat', sans-serif` (non-cursive) and `'Vibur', cursive` (cursive). Sizes are unchanged — only `font-family` (and `font-weight` → Regular for Label, since Vibur likely doesn't have a Light weight) switches.
 2. State: in-memory is consistent with current prototype scope (per `CLAUDE.md` — no backend). If `profiles` table already exists (it does, per Account Tab build), consider a `heading_style` column for persistence across sessions — note as optional/stretch.
-3. Sacramento is a script font with deep ascenders/descenders — at 56px double-check line-height doesn't clip, and re-check WCAG contrast at whatever weight/size lands (script faces read lighter than serif at the same color).
+3. Vibur is a handwriting-style script font — double-check line-height/vertical clipping isn't an issue at existing sizes (36/24/18/16px), and re-check WCAG contrast (script faces read lighter than serif/sans at the same color).
 4. Update the "Design System → Typography" table (below) to show both presets side by side, matching the table above.
 
 **AccountScreen.tsx layout addition (per sketch):**
