@@ -103,6 +103,14 @@ h1 { font-size: 36px; }
 h2 { font-size: 24px; }
 h3 { font-size: 18px; }
 
+/* `<b>` and `<strong>` default to bold in user-agent styles. Force
+   them to inherit so they ride the same Light/Regular weights the
+   surrounding text uses — per the five-role typography spec, no
+   heavier weights are sanctioned. */
+b, strong {
+  font-weight: inherit;
+}
+
 button {
   font-family: var(--font-sans);
   cursor: pointer;
@@ -343,7 +351,7 @@ button {
 }
 .fab-hint {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.62;
   letter-spacing: 0.03em;
@@ -393,7 +401,7 @@ button {
 }
 .day__letter {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.06em;
   color: var(--charcoal);
   opacity: 0.45;
@@ -424,7 +432,7 @@ button {
 /* Selected-day label */
 .day-label {
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.7;
   margin-bottom: 14px;
@@ -466,7 +474,7 @@ button {
 }
 .keyword {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   background: rgba(255, 255, 255, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.7);
@@ -478,7 +486,7 @@ button {
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.55;
   letter-spacing: 0.02em;
@@ -513,7 +521,7 @@ button {
   justify-content: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.03em;
   padding: 13px 18px;
   border-radius: var(--r-pill);
@@ -631,7 +639,7 @@ button {
 }
 .nav-btn span {
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.06em;
   opacity: 0.5;
 }
@@ -680,7 +688,7 @@ button {
   background: var(--charcoal);
   color: var(--on-surface-solid);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.03em;
   padding: 14px 26px;
   border-radius: var(--r-pill);
@@ -804,7 +812,7 @@ button {
 }
 .i-label {
   font-size: 10px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--charcoal);
@@ -823,7 +831,7 @@ button {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.55;
   text-align: center;
@@ -1011,7 +1019,7 @@ button {
   border-radius: var(--r-pill);
   border: 1.5px solid rgba(34, 34, 34, 0.14);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   height: fit-content;
 }
@@ -1048,7 +1056,7 @@ button {
   border: 1.5px solid var(--charcoal);
   background: var(--surface-solid);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   outline: none;
   width: 130px;
@@ -1113,7 +1121,7 @@ button {
   align-items: center;
   gap: 6px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.5;
   letter-spacing: 0.02em;
@@ -1209,7 +1217,7 @@ button {
 }
 .ld-chip {
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   padding: 6px 14px;
   border-radius: var(--r-pill);
@@ -1413,7 +1421,7 @@ button {
 .quad-btn--len { background: linear-gradient(150deg, rgba(130,152,212,0.45), rgba(130,152,212,0.92)); }
 .quad-btn__label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   opacity: 0.75;
@@ -1461,7 +1469,7 @@ button {
   box-shadow: var(--shadow-soft);
   justify-self: center;
 }
-.eg-counter strong { font-size: 15px; font-weight: 700; }
+.eg-counter strong { font-size: 15px; font-weight: 400; }
 .eg-counter span { opacity: 0.6; }
 .eg-spacer { width: 40px; height: 40px; }
 .eg-viewport {
@@ -1524,7 +1532,7 @@ button {
   font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.2;
-  font-weight: 500;
+  font-weight: 400;
   text-align: center;
   overflow-wrap: break-word;
   word-break: normal;
@@ -1538,7 +1546,7 @@ button {
   transition: box-shadow 0.18s, border-color 0.18s;
 }
 .eg-chip--on {
-  font-weight: 600;
+  font-weight: 400;
   box-shadow: 0 6px 16px rgba(34, 34, 34, 0.22);
 }
 .eg-chip--disabled {
@@ -1588,7 +1596,7 @@ button {
   border-radius: 999px;
   font-family: var(--font-sans);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   letter-spacing: 0.01em;
   /* background set inline via tintQuadrant — opaque so the card's
@@ -1650,7 +1658,7 @@ button {
   border-radius: 999px;
   padding: 10px 16px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   background: rgba(255, 255, 255, 0.7);
 }
 .er-remove {
@@ -1822,7 +1830,7 @@ button {
   border-radius: var(--r-pill);
   font-family: var(--font-sans);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.04em;
   color: var(--charcoal);
   opacity: 0.55;
@@ -1911,13 +1919,13 @@ button {
 }
 .week-bars__letter {
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.6;
 }
 .week-bars__col--today .week-bars__letter {
   opacity: 1;
-  font-weight: 700;
+  font-weight: 400;
 }
 .week-bars__bar {
   width: 14px;
@@ -1951,7 +1959,7 @@ button {
 }
 .month-grid__head {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.55;
   text-align: center;
@@ -2172,7 +2180,7 @@ button {
   border-radius: var(--r-pill);
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.55;
   background: transparent;
@@ -2198,7 +2206,7 @@ button {
 .auth-field__label {
   font-family: var(--font-sans);
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.04em;
   color: var(--charcoal);
   opacity: 0.65;
@@ -2238,7 +2246,7 @@ button {
   border-radius: 10px;
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.6;
   background: transparent;
@@ -2279,7 +2287,7 @@ button {
   color: var(--charcoal);
   opacity: 0.4;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   margin: 4px 0;
@@ -2320,7 +2328,7 @@ button {
   padding: 4px 8px;
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
   opacity: 0.72;
   text-decoration: underline;
@@ -2483,7 +2491,7 @@ button {
   border-radius: var(--r-pill);
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: opacity 0.18s, transform 0.12s;
@@ -2836,7 +2844,7 @@ button {
 .acct-pill {
   align-self: flex-start;
   font-family: var(--font-sans);
-  font-weight: 500;
+  font-weight: 400;
   font-size: 13px;
   letter-spacing: 0.04em;
   color: var(--charcoal);
@@ -3126,7 +3134,7 @@ button {
   border: 1.5px solid;
   font-family: var(--font-sans);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--charcoal);
 }
 .qlr-transcript {

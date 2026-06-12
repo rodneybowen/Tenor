@@ -800,7 +800,7 @@ function BreakdownBubbles({
               textAnchor="middle"
               dominantBaseline="central"
               fontSize={fontSize}
-              fontWeight={600}
+              fontWeight={400}
               fontFamily="var(--font-sans)"
               fill="var(--charcoal)"
             >
