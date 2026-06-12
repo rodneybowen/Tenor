@@ -2871,11 +2871,17 @@ button {
    ════════════════════════════════════════════ */
 
 /* Edit-window countdown — pie + M:SS. Lives inside .ld-corner as a
-   flex child; the parent handles positioning + right-alignment. */
+   flex child; the parent handles positioning + right-alignment.
+   `margin-right: auto` pushes the timer to the LEFT side of the corner
+   row so the pencil (and close X, when present) stay pinned RIGHT.
+   This keeps the rightmost edge visually balanced whether the X is
+   there (past-log view) or absent (just-submitted view) — no gaping
+   hole between the pencil and the screen edge. */
 .edit-timer {
   display: flex;
   align-items: center;
   gap: 4px;
+  margin-right: auto;
   pointer-events: none;
 }
 .edit-timer__text {
