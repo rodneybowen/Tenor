@@ -2971,6 +2971,74 @@ button {
 }
 .acct-unlink:disabled { opacity: 0.5; cursor: default; }
 
+/* ── Reminders section ─────────────────────────────
+   Sits between Linked account and the Sign Out CTA.
+   Layout: rowlabel + toggle on one line, time input on its own row,
+   helper meta beneath. Spacing inherits the section-level tokens. */
+.acct-reminders {
+  /* Tighten the row gap a touch — toggle row + input + helper feel
+     more like a single control cluster than three separate items. */
+  gap: var(--space-snug);
+}
+.acct-reminder-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.acct-reminder-rowlabel {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  color: var(--charcoal);
+}
+.acct-reminder-time {
+  /* Inherits .acct-input surface; native time pickers vary by OS but
+     this normalizes the box and right-aligns the digits to match. */
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+.acct-reminder-time:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.acct-reminder-helper {
+  /* Inherits .acct-meta's muted color; just trims the top margin so
+     it reads as a caption for the time picker above. */
+  margin-top: 0;
+}
+
+/* iOS-style toggle pill, tuned to neutrals (no brand-color fill —
+   keeps the Account screen calm). */
+.acct-toggle {
+  --thumb: 22px;
+  width: 46px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: none;
+  padding: 3px;
+  background: rgba(34, 34, 34, 0.18);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+.acct-toggle.is-on {
+  background: var(--charcoal);
+}
+.acct-toggle-thumb {
+  display: block;
+  width: var(--thumb);
+  height: var(--thumb);
+  border-radius: 50%;
+  background: var(--surface-solid);
+  transform: translateX(0);
+  transition: transform 0.18s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.acct-toggle.is-on .acct-toggle-thumb {
+  transform: translateX(18px);
+}
+
 /* ════════════════════════════════════════════
    LogDetailScreen — 3-minute edit window UI
    ════════════════════════════════════════════ */

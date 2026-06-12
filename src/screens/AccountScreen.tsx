@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { GoogleLogo, SignOut, X, CircleNotch } from '@phosphor-icons/react';
 import {
   hasGoogleIdentity,
@@ -6,6 +6,7 @@ import {
   signOut,
   supabase,
   updateName,
+  updateReminderSettings,
   type DbProfile,
 } from '../lib/supabase';
 
@@ -57,6 +58,57 @@ export default function AccountScreen({
   const [linkError, setLinkError] = useState<string | null>(null);
 
   const [signingOut, setSigningOut] = useState(false);
+
+  // ── Reminders: optimistic local state, persisted to profiles.
+  //    Toggle saves immediately; time input debounces ~500ms after the
+  //    last keystroke (mobile time pickers can fire onChange per digit).
+  const [reminderEnabled, setReminderEnabled] = useState<boolean>(
+    profile.reminder_enabled,
+  );
+  const [reminderTime, setReminderTime] = useState<string>(
+    // Strip the seconds for the native <input type="time"> (HH:MM).
+    profile.reminder_time.slice(0, 5),
+  );
+  const [reminderError, setReminderError] = useState<string | null>(null);
+  const reminderTimeoutRef = useRef<number | null>(null);
+
+  async function saveReminder(patch: {
+    reminderEnabled?: boolean;
+    reminderTime?: string;
+  }) {
+    setReminderError(null);
+    try {
+      const next = await updateReminderSettings(profile.id, patch);
+      onProfileUpdated(next);
+    } catch (err) {
+      setReminderError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function onReminderToggle(next: boolean) {
+    setReminderEnabled(next);
+    void saveReminder({ reminderEnabled: next });
+  }
+
+  function onReminderTimeChange(next: string) {
+    setReminderTime(next);
+    if (reminderTimeoutRef.current !== null) {
+      window.clearTimeout(reminderTimeoutRef.current);
+    }
+    reminderTimeoutRef.current = window.setTimeout(() => {
+      reminderTimeoutRef.current = null;
+      void saveReminder({ reminderTime: next });
+    }, 500);
+  }
+
+  // Flush any pending debounced time-picker save if the screen unmounts.
+  useEffect(() => {
+    return () => {
+      if (reminderTimeoutRef.current !== null) {
+        window.clearTimeout(reminderTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -217,7 +269,7 @@ export default function AccountScreen({
         </section>
 
         {/* ── Linked account (full-width pill + unlink) ── */}
-        <section className="acct-section acct-section--last">
+        <section className="acct-section">
           <span className="acct-label">Linked account</span>
           {googleLinked === null ? (
             <p className="acct-meta">Checking…</p>
@@ -257,6 +309,38 @@ export default function AccountScreen({
             </button>
           )}
           {linkError && <p className="acct-error">{linkError}</p>}
+        </section>
+
+        {/* ── Reminders (daily check-in toggle + time) ── */}
+        <section className="acct-section acct-section--last acct-reminders">
+          <span className="acct-label">Reminders</span>
+
+          <div className="acct-reminder-row">
+            <span className="acct-reminder-rowlabel">Daily reminder</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={reminderEnabled}
+              aria-label="Daily reminder"
+              className={`acct-toggle${reminderEnabled ? ' is-on' : ''}`}
+              onClick={() => onReminderToggle(!reminderEnabled)}
+            >
+              <span className="acct-toggle-thumb" aria-hidden="true" />
+            </button>
+          </div>
+
+          <input
+            type="time"
+            className="acct-input acct-reminder-time"
+            value={reminderTime}
+            onChange={(e) => onReminderTimeChange(e.target.value)}
+            disabled={!reminderEnabled}
+            aria-label="Reminder time"
+          />
+          <p className="acct-meta acct-reminder-helper">
+            We'll check in if you haven't logged a mood by this time.
+          </p>
+          {reminderError && <p className="acct-error">{reminderError}</p>}
         </section>
 
         {/* ── Sign out (full-width primary) ────────────── */}

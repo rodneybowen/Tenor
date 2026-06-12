@@ -60,6 +60,13 @@ export interface DbProfile {
   first_name: string | null;
   last_name: string | null;
   timezone: string | null;
+  /** Reminder/notification preferences — see migration 0006. */
+  reminder_enabled: boolean;
+  /** ISO HH:MM:SS in `timezone`. Defaulted to '20:00:00' at signup. */
+  reminder_time: string;
+  /** Server-cycle tracking — clients don't touch these directly. */
+  last_reminder_date: string | null;
+  last_reminder_stage: number;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -257,6 +264,32 @@ export async function updateName(
       last_name: last || null,
       display_name: display || null,
     })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbProfile;
+}
+
+/** Persist reminder toggle / time. Pass either field; both are
+ *  individually optional so the AccountScreen can save the toggle
+ *  immediately and the time picker on debounce without colliding.
+ *  `reminderTime` should be 'HH:MM' or 'HH:MM:SS' (Postgres TIME). */
+export async function updateReminderSettings(
+  userId: string,
+  patch: { reminderEnabled?: boolean; reminderTime?: string },
+): Promise<DbProfile> {
+  const sb = requireClient();
+  const update: Record<string, unknown> = {};
+  if (patch.reminderEnabled !== undefined) update.reminder_enabled = patch.reminderEnabled;
+  if (patch.reminderTime !== undefined) {
+    // Normalize HH:MM → HH:MM:00 so Postgres TIME comparisons stay tidy.
+    const t = patch.reminderTime;
+    update.reminder_time = /^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t;
+  }
+  const { data, error } = await sb
+    .from('profiles')
+    .update(update)
     .eq('id', userId)
     .select()
     .single();
