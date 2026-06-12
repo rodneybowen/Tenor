@@ -1,0 +1,76 @@
+# Tenor — Changelog
+
+Compact, dated reference for every shipped change. Run `git show <sha>` in `tenor-app/` for the full diff of any commit.
+
+Companion to `TENOR_CONTEXT.md`, which holds the durable context — design system, design rules, product decisions, technical architecture, and feature specs. **What changed and when** lives here; **why it is the way it is** lives there.
+
+When adding a new entry: prepend below the most recent date row, keep it to one line, and link to a fuller note in `TENOR_CONTEXT.md` if the change introduces new architecture or design rules.
+
+---
+
+## 2026
+
+### June
+
+| Date | SHA | Change |
+|---|---|---|
+| Jun 12 | (next push) | Branding pass part 2 — Auth wordmark + native iOS AppIcon. `<h1>Tenor</h1>` text on AuthScreen + ProfileSetupScreen replaced with `full logo - dark.svg` (light aurora bg → dark variant per variant-selection rule). `.auth-wordmark` CSS dropped serif type styling, now sizes the img to 40px height. Native iOS AppIcon (`ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png`) regenerated at 1024×1024 from `fill icon color.png`. TenorControls widget iconset left alone (placeholder Contents.json with no filename refs — separate cleanup). Rebuild in Xcode to pick up the icon. |
+| Jun 12 | `8c841d2` | Branding pass — web favicon + PWA icon. Replaced placeholder `public/favicon.svg` with `t logo.svg` (color gradient mark, transparent — reads on light + dark browser tabs). Added `manifest.webmanifest` and `apple-touch-icon.png` (180px) + `icon-192.png` / `icon-512.png` sourced from `fill icon color.png` (opaque rounded-square, gradient bg, dark "t"). `index.html` now links the manifest + apple-touch-icon. Auth-screen wordmark swap (task 3) deferred — no AuthScreen in this prototype repo; belongs to the production `tenor-app/` repo. Native iOS `AppIcon.appiconset` (task 2 native half) skipped for the same reason. |
+| Jun 10 | (Xcode-only) | Quick Log Control Center tile → opens the app to QuickLogScreen. Final shape after a 6-hour detour: tile tap fires `QuickLogIntent` (with `openAppWhenRun: true` AND `OpensIntent(OpenURLIntent("tenor://quick-log"))` as belt-and-suspenders), iOS prompts Face ID (unavoidable from Lock Screen), Tenor opens, JS's existing `quickLogTrigger.ts` picks up the URL and routes to QuickLogScreen which auto-starts recording. **Abandoned mid-build** (do not resurrect without re-reading the postmortem below): native `QuickLogRecorder.swift` doing AVAudioEngine + SFSpeechRecognizer in background-audio mode, LiveActivity with interactive Stop button, App Group shared UserDefaults flag mechanism, full-screen overlay over WKWebView during recording, `UIApplication.shared.perform(Selector("suspend"))` private-API hack to send the app back to background after launch. **Why we walked away:** Shazam's "tap → recording with no app launch" experience requires (a) Apple's privileged ShazamKit framework (not available to third parties for generic voice), or (b) silent push notifications via APNs which requires a paid Apple Developer Program subscription ($99/yr). On Personal Team / free signing, Face ID from Lock Screen is iOS-enforced and cannot be bypassed. The simple "tile opens app to QuickLogScreen" version is dramatically less code (one Swift file plus the Control Widget shell) and uses the JS infrastructure that was already shipped on `2d893bd`. Strip the rest. |
+| Jun 11 | `ca3f81f` | Locked the app to portrait orientation (`Info.plist` `UISupportedInterfaceOrientations`, iPhone + iPad). Web layouts aren't landscape-friendly yet; revisit when responsive landscape lands. Native-only — rebuild in Xcode to pick up. |
+| Jun 12 | `4ecc8b1` | Slop-cleanup audit (5 atomic commits, `faf457b` → `4ecc8b1`). **Bucket A**: deleted dead `QuickLogScreen.tsx`, `QuickLogReviewScreen.tsx`, and the Xcode-generated 🤩-emoji `TenorControls.swift` + Timer-stub `TenorControlsControl.swift` template widgets that were compiled-but-unregistered. **B**: stripped `'scan'` from `LogMode` unions in `theme/emotions.ts` + `lib/supabase.ts`; dropped Camera icon + "Scanned" label from `LogEntryCard`. **C**: killed stale "camera for scan" line in TENOR_CONTEXT. **D**: `.ld-corner` perception fix — `margin-right: auto` on `.edit-timer` so the pencil pins right whether or not the close X is present. **E**: new `--surface-solid` / `--on-surface-solid` tokens, swept all 21 raw `#fff`/`#ffffff` uses through them. Zero runtime visual change. |
+| Jun 12 | `b9747b5` | Channel-parity rule made durable in `TENOR_CONTEXT.md`. Committed the orphaned iOS Xcode project + entitlements + TenorAppIntent + QuickLogControl + TenorControls extension — the entire Quick Log native infrastructure was sitting uncommitted on the dev's machine and never reached GitHub. (Includes two Xcode auto-generated template files — `TenorControls.swift` 🤩-emoji widget and `TenorControlsControl.swift` StartTimerIntent stub — compiled-but-unregistered slop, cleaned up in audit bucket A next.) |
+| Jun 11 | `bf001eb` | Removed the Scan bubble from LogMethodScreen — it was out of scope (privacy) per TENOR_CONTEXT but the JSX still rendered it. Now Speak + Type only. |
+| Jun 11 | `e90772f` | Edit pencil + timer now also show on the just-submitted log screen (was past-log view only) — the moment a user is most likely to fix a mis-detection. |
+| Jun 11 | `b731d9e` | Edit-window countdown timer on Log Detail — 20px SVG pie (track `--n-200`, arc `--n-700`) depleting clockwise next to the edit pencil, `M:SS` text, arc reddens to `quadrantColor('hen',1)` in the final 30s, vanishes at 0. New `EditWindowTimer.tsx`; additive source-aware ms helpers in `editGate.ts` (`remainingEditMs`/`editWindowEnd`/`editWindowMs`). Pie hidden for quick logs (7-day window). The edit window + pencil + gate already existed — this is only the missing visual. |
+| Jun 10 | `fab9439` | Quick Log shortcut now opens the EXISTING voice flow (VoiceScreen: "Say it out loud.", live transcript, manual stop, chip review) tagged `source:'quick'` for the 7-day edit window. Bespoke QuickLogScreen/QuickLogReviewScreen unrouted (pulsing circle + 2.5s auto-stop killed). Native trigger: Control tile AppIntent writes App Group flag + `openAppWhenRun` → AppDelegate observes on didBecomeActive → dispatches `tenor:quicklog` window event → App.tsx routes to voice. |
+| Jun 9 | `2bf7886` | Quick log edit window bumped from one-shot → 7 days from `logged_at`. Quick logs editable repeatedly within the window; `editedAt` no longer gates them. Spec change captured the reality that users hit Quick Log on rough days and may not be up to triaging the log for several days. |
+| Jun 9 | `2d893bd` | Quick Log: `tenor://quick-log` (iOS Shortcut) + `?quicklog=1` (web) deep-links into a fullscreen, no-chrome capture screen that auto-starts SR on mount, auto-submits after 2.5s of silence (or tap anywhere), tags the log `source: 'quick'`, then drops the user on a "Logged." review screen with a one-shot "Edit emotions" CTA (visible iff `editedAt == null`). VoiceScreen stop button gains the same processing-debounce. URL scheme already registered — user creates the Shortcut manually. |
+| Jun 9 | `1af121a` | 3-minute edit window for chips, plus one-shot edit path for `source: 'quick'`. New migration `0003_log_edits.sql` adds `source` (`speak`/`type`/`select`/`quick`) + `edited_at` to `logs`. `lib/editGate.ts:canEdit` is the gate. `updateLogChips` does a delete + re-insert + `edited_at` bump. LogDetailScreen renders a pencil top-right when the gate allows; tap → inline edit mode using the VoiceScreen review chip UX (rename / × / + add), ✓/× action bar in the header, save calls through to App's `saveLogChips`. Insert paths now pass `source`: `'speak'` for voice, `'select'` for emotion picker. Apply `0003` on Supabase before testing with an account. |
+| Jun 4 | `a7e0566` | DayMoodLine node granularity: emotion category instead of log. Each log expands to 1–4 nodes (one per unique quadrant in chip order, duplicates dropped on first appearance), flattened chronologically across the day. Same rule applies to LogThreadScreen's mood line. Period-nav label switched from Merriweather 18 → Montserrat Regular 16 — it's navigational info, not a heading. |
+| Jun 4 | `ace69aa` | Account: sign out button switched to `.btn-primary` so it matches every other CTA in the app instead of using an ad-hoc bordered style. |
+| Jun 4 | `6e2f1cb` | Account tab built — display name (inline editable + Save), account type read-only pill, Link Google CTA (or "linked" label), divider + Sign out. PillNav gains a `hide` prop so Account is hidden entirely in guest mode. New Supabase helpers: `updateDisplayName`, `hasGoogleIdentity`, `linkGoogleIdentity`. `useAuth.applyProfile` mirrors a saved row into state so the home greeting refreshes instantly. |
+| Jun 4 | `42ae6d5` | EmotionGrid back button now lands on the quadrant picker page of LogMethodScreen instead of the speak/type page. New `initialSection` prop on LogMethodScreen + per-entry-point setter in App.tsx. |
+| Jun 4 | `20eccee` | EmotionGrid: loading state while the Google Sheet vocabulary CSV resolves. Centered CircleNotch spinner replaces the fallback-vocab → real-vocab flicker on first open. Viewport stays mounted (visibility:hidden) so scroll/interaction refs don't re-attach. Footer (def card + next) omitted until chips are present. Fetch error → falls through to hardcoded fallback so the user is never stuck. |
+| Jun 4 | `f8b698e` | LogThreadScreen: dotted line connects every consecutive item in the chain (card → card → "+ add to this log"), per sketch. Inline "+ add" button replaces the absolute floating footer so the line terminates at it. |
+| Jun 4 | `b2c8e10` | Drop the dotted same-day thread connector entirely. Felt inconsistent against cross-day threads which never had a line; the "X logs" pill alone is the cleaner thread-membership cue. |
+| Jun 4 | `a0e093b` | Thread cards: "X logs" pill moves to bottom-right corner per sketch; dotted connector now drawn per-gap only (was a single span behind cards, which bled through translucent gradients — looked like the line was floating above the cards). |
+| Jun 4 | `27f888f` | "Add to this log" threads end-to-end — `parent_log_id` write-through, topic-naming popup on first addition (skip-allowed), `LogThreadScreen` with renameable header + mood line + chronological list, "X logs" pill on threaded cards, same-day dotted connector between thread cards, tap-routes thread cards to LogThreadScreen and standalone cards to LogDetailScreen. New migration 0002 adds `topic` column to `logs`. |
+| Jun 4 | `82770e0` | EmotionGrid: chip click works on desktop. `setPointerCapture` was being called in `pointerdown` on the viewport, routing the synthesized click event to the viewport instead of the chip — so onClick never fired on desktop. Touch was unaffected (handler returned early on non-mouse pointers). Now capture is deferred until movement crosses the 4px drag threshold; pure clicks never capture and the click reaches the chip normally. |
+| Jun 4 | `8eb3887` | Guest mode — "Continue as guest" on the auth screen drops into the full patient-side app with 4 yesterday-anchored seed logs, no Supabase reads/writes, logs persisted to `sessionStorage` (lost on tab close). HomeScreen greeting omits the name when guest. `useAuth` gains `enterGuest()` / `exitGuest()` + a `'guest'` status. New `src/lib/guestSeed.ts` builds the seed + handles session persistence. |
+
+### May
+
+| Date | SHA | Change |
+|---|---|---|
+| May 30 | `8a0b0c9` | iOS Capacitor build live on device — AppDelegate WKWebView transparency + `Info.plist` mic/speech permissions + `tenor://` URL scheme; Google OAuth via system Safari + hash-token session; `contentInset: 'never'` edge-to-edge with `mask-image` content fade replacing the white top notch |
+| May 30 | `8a0b0c9` | Scroll fix: dropped `display: flex` from `.home-scroll` + `.logs-shell` (flex-column + overflow shrinks children, so `scrollHeight === clientHeight`); diagnosed via on-device debug overlay |
+| May 30 | `8a0b0c9` | Velocity-based EmotionGrid scroll haptic + `haptics.prime()` on mount; back-button position unified across screens; EmotionGrid centers on inner-corner chip of picked quadrant; D/W/M/Y tap always returns to current period; Day view reordered (mood line above logs list) |
+| May 29 | `4fb8874` | Submit busy-state — disabled ✓ + spinning CircleNotch on Voice + Emotion review, plus an App-level submittingRef guard to hard-block duplicate inserts (fixes rapid-tap dup-log bug on slow networks) |
+| May 29 | `9adb985` | Day mood line — per-segment linearGradient between consecutive nodes' quadrant colors |
+| May 29 | `1940368` | Logs: Day tab defaults to today (not the start of the previous period) |
+| May 29 | `f6e589d` | Layout — week card grows to fit logs (no internal scroll); 36px gap between Day-view list and "Your day's mood" section |
+| May 29 | `f8aaec3` | `TODAY = new Date()` — greeting, week card, and log timestamps all reflect real local time |
+| May 29 | `dbbcabf` | Live data — `fetchLogs` on auth, `insertLog` on submit, mock fallback when no env vars; `displayName` flows from `profile.display_name` into home greeting |
+| May 29 | `88139cc` | CI — forward `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` from repo secrets to `npm run build` |
+| May 29 | `737c6cf` | Auth polish — H1 Tenor wordmark, visible Google-button stroke |
+| May 29 | `bdf749d` | Auth screens — sign-in / sign-up (email/password + Google OAuth + Patient/Therapist role + display name) + ProfileSetupScreen for post-OAuth + auth gate in App.tsx |
+| May 29 | `4e1d001` | DB scaffolding — Supabase migration (profiles/therapist_patients/logs/log_chips/audit_log) + RLS + audit triggers + typed client + provisioning README |
+| May 22 | `176a85b` | Day mood line: Catmull-Rom smooth multi-point + trend-aware concavity (cap/cup) |
+| May 22 | `8af0f49` | Day mood line: quadratic Bézier bulge (no straight diagonals for 2-point days) |
+| May 22 | `71e5f5d` | Breakdown bubbles: opaque, packed, % labels, seeded positions, drift animation; Year: blurry gradient blobs; fade-up animation |
+| May 21 | `bfd7a2d` | Full log history: D/W/M/Y, period nav, drill-down, 180-day seeded mocks |
+| May 21 | `6a7e5f6` | Universal log-detail screen (post-log + tapped-from-history) |
+| May 21 | `f28d234` | iOS PWA: `default` status bar, viewport-anchored pill nav (final) |
+| May 21 | `0fac22e` | Live emotion vocabulary from Google Sheet CSV |
+| May 20 | `584c962` | Copy: "quadrant" → "category" (user-facing only) |
+| May 20 | `5099f9b` | Stronger fisheye: center 1.08×, edge 0.60× + opacity 0.42 |
+| May 20 | `1e585d7` | Definition card under centered chip |
+| May 20 | `cbbee2d` | Mouse click-drag pan for 2D grid navigation |
+| May 20 | `cc6db92` | Proximity scroll-snap + Web Vibration API haptics |
+| May 20 | `600daca` | Chip style: light tint unselected, vibrant fill + ring selected |
+| May 20 | `1114a02` | Emotion-selector flow: quadrant picker + grid + review + confirmation |
+| May 19 | `876233a` | Pill nav: fully opaque (final) |
+| May 19 | `6454b6b` | GitHub Pages deploy workflow |
+| May 19 | `1c592d5` | Speak flow — Web Speech API, keyword highlighting, mic-permission popup, `?demo=1` |
+| May 19 | `a0c1a6c` | Scaffold: Vite + React + TS, home screen |
