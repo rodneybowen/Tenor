@@ -88,16 +88,18 @@ body {
    Use bare <h1> / <h2> / <h3> / <p> in new screens. Existing
    bespoke headings (.greeting, .voice-title, etc.) keep their
    custom styling — they were authored before these rules existed. */
+/* All Merriweather headings ship at Light (300) per the design
+   system reference. Bespoke heading classes (`.greeting`, `.acct-title`,
+   `.voice-title`, etc.) should NOT override `font-weight` — let them
+   inherit from this shared block. */
 h1, h2, h3 {
   font-family: var(--font-serif);
-  font-weight: 400;
+  font-weight: 300;
   margin: 0;
   color: var(--charcoal);
   line-height: 1.2;
 }
-/* H1 ships at Light (300) to match the home-screen .greeting that
-   set the brand precedent. H2/H3 stay at Regular (400). */
-h1 { font-size: 36px; font-weight: 300; }
+h1 { font-size: 36px; }
 h2 { font-size: 24px; }
 h3 { font-size: 18px; }
 
@@ -361,7 +363,7 @@ button {
 .week-card__title {
   font-family: var(--font-serif);
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--charcoal);
   margin-bottom: 20px;
 }
@@ -2142,7 +2144,7 @@ button {
 .auth-card__title {
   font-family: var(--font-serif);
   font-size: 24px;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--charcoal);
   text-align: center;
   margin: 4px 0 0;
@@ -2413,7 +2415,7 @@ button {
   margin: 0;
   font-family: var(--font-serif);
   font-size: 22px;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--charcoal);
   text-align: center;
 }
@@ -2608,7 +2610,7 @@ button {
 .lt-topic__heading h1 {
   font-family: var(--font-serif);
   font-size: 28px;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--charcoal);
   margin: 0;
   border-bottom: 1.5px dashed rgba(34, 34, 34, 0.35);
@@ -2622,7 +2624,7 @@ button {
 .lt-topic__input {
   font-family: var(--font-serif);
   font-size: 28px;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--charcoal);
   background: transparent;
   border: none;
@@ -2645,7 +2647,7 @@ button {
 .lt-mood__title {
   font-family: var(--font-serif);
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 300;
   color: var(--charcoal);
   margin: 0;
   text-align: center;
