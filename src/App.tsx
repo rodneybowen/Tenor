@@ -43,6 +43,10 @@ import {
   initReminderActionListener,
   scheduleReminders,
 } from './lib/reminderScheduler';
+import {
+  ensurePushSubscribed,
+  registerServiceWorker,
+} from './lib/pushSubscribe';
 
 type Screen =
   | 'home'
@@ -216,6 +220,58 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => initQuickLogCallback(enterQuickLog), []);
+
+  // Web Push: register the service worker once at mount (no-op if
+  // the browser doesn't support SWs). Subscribe + upsert happens
+  // post-auth, see the effect below.
+  useEffect(() => {
+    void registerServiceWorker();
+  }, []);
+
+  // Web Push routing bridge. The SW posts {type: 'tenor:reminder',
+  // stage} when the user taps a push notification; we re-use the
+  // same handlers as the iOS action listener: stage 1 → LogMethod,
+  // stage 2 → tenor:quicklog. Also catches a `?reminderStage=`
+  // query param the SW falls back to when no tab was already open.
+  useEffect(() => {
+    function route(stage: number) {
+      if (stage === 2) {
+        window.dispatchEvent(new Event('tenor:quicklog'));
+      } else {
+        setScreen('logMethod');
+      }
+    }
+    function onMessage(e: MessageEvent) {
+      const data = e.data as { type?: string; stage?: number } | null;
+      if (data && data.type === 'tenor:reminder') route(data.stage ?? 1);
+    }
+    window.addEventListener('message', onMessage);
+
+    // Cold-open-from-push fallback path: consume ?reminderStage=N once.
+    const sp = new URLSearchParams(window.location.search);
+    const stage = Number(sp.get('reminderStage'));
+    if (stage === 1 || stage === 2) {
+      route(stage);
+      sp.delete('reminderStage');
+      const search = sp.toString();
+      window.history.replaceState(
+        null,
+        '',
+        window.location.pathname + (search ? '?' + search : ''),
+      );
+    }
+
+    return () => window.removeEventListener('message', onMessage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // After auth → subscribe to push (prompts permission if needed,
+  // then upserts push_subscriptions row). No-op on iOS WebView and
+  // unsupported browsers — those run the native scheduler instead.
+  useEffect(() => {
+    if (auth.state.status !== 'authenticated') return;
+    void ensurePushSubscribed({ userId: auth.state.profile.id });
+  }, [auth.state.status, auth.state.status === 'authenticated' ? auth.state.profile.id : null]);
 
   // Reminder action listener (iOS only — no-op on web). Stage 1 (even
   // id) takes the user to the Log Method screen. Stage 2 (odd id)
