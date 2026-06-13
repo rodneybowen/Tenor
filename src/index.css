@@ -311,7 +311,7 @@ button {
 }
 .greeting {
   font-family: var(--font-serif);
-  font-size: clamp(28px, 8vw, 36px);
+  font-size: 36px;
   font-weight: 300;
   color: var(--charcoal);
   text-align: center;
@@ -775,7 +775,7 @@ button {
 .lm-back-up:hover { opacity: 1; }
 .lm-title {
   font-family: var(--font-serif);
-  font-size: clamp(24px, 7vw, 30px);
+  font-size: 36px;
   font-weight: 300;
   color: var(--charcoal);
   text-align: center;
@@ -856,7 +856,7 @@ button {
 }
 .voice-title {
   font-family: var(--font-serif);
-  font-size: clamp(22px, 6.5vw, 28px);
+  font-size: 36px;
   font-weight: 300;
   color: var(--charcoal);
   text-align: center;
@@ -1343,7 +1343,7 @@ button {
 }
 .mic-modal__card h2 {
   font-family: var(--font-serif);
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 300;
   color: var(--charcoal);
   margin-bottom: 16px;
@@ -1377,7 +1377,7 @@ button {
    ════════════════════════════════════════════ */
 .lm-quad-title {
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 300;
   color: var(--charcoal);
   text-align: center;
@@ -1633,7 +1633,7 @@ button {
 }
 .er-title {
   font-family: var(--font-serif);
-  font-size: 24px;
+  font-size: 36px;
   font-weight: 300;
   color: var(--charcoal);
   margin: 0;
@@ -2422,7 +2422,7 @@ button {
 .topic-popup-title {
   margin: 0;
   font-family: var(--font-serif);
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 300;
   color: var(--charcoal);
   text-align: center;
@@ -2617,7 +2617,7 @@ button {
 }
 .lt-topic__heading h1 {
   font-family: var(--font-serif);
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 300;
   color: var(--charcoal);
   margin: 0;
@@ -2631,7 +2631,7 @@ button {
 }
 .lt-topic__input {
   font-family: var(--font-serif);
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 300;
   color: var(--charcoal);
   background: transparent;

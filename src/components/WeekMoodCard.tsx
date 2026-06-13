@@ -29,7 +29,7 @@ export default function WeekMoodCard({
 
   return (
     <section className="week-card" aria-label="This week's mood">
-      <h2 className="week-card__title">This week's mood</h2>
+      <h3 className="week-card__title">This week's mood</h3>
 
       <div className="day-row" role="tablist" aria-label="Days this week">
         {week.map((day) => {
