@@ -604,10 +604,15 @@ button {
 
 /* ── Floating pill nav ── */
 .pill-nav {
+  /* Single source of truth for the floating-nav gap. Bottom inset
+     swells past 24px on iPhones with home indicators; sides + bottom
+     all read the same expression so the gap is visually equal on
+     every edge. */
+  --pnav-gap: max(24px, env(safe-area-inset-bottom, 24px));
   position: absolute;
-  bottom: max(24px, env(safe-area-inset-bottom, 24px));
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: var(--pnav-gap);
+  left: var(--pnav-gap);
+  right: var(--pnav-gap);
   /* Fully opaque — accessibility over style. No backdrop-filter
      dependency, so it's identical and fully legible on every
      device/OS regardless of transparency settings. Depth comes
@@ -623,7 +628,10 @@ button {
   z-index: 20;
 }
 .nav-btn {
-  width: 76px;
+  /* Flex evenly across the now-full-width pill so the inter-button
+     rhythm scales with the device, not a fixed 76px-each layout. */
+  flex: 1;
+  min-width: 0;
   height: 48px;
   border-radius: 28px;
   display: flex;
