@@ -327,7 +327,8 @@ The spec below is the authoritative behavior. A few implementation choices to kn
 ### Stage 1 — Initial reminder
 - **Fires:** at `profiles.reminder_time` (default `20:00`), evaluated in the user's `profiles.timezone` (already populated at signup per "This weekend" log).
 - **Condition:** only if `reminder_enabled = true` AND the user has not logged a mood yet for today (today = current date in the user's timezone).
-- **Body:** "Hello {first_name}! You haven't logged your mood yet, want to jot down how your day went?" — pulls `profiles.first_name`. (Multiple phrase variants are a future enhancement — ship with this single phrase for now, but write the body-text lookup as a small array/function of one item so swapping in variants later is a one-line change.)
+- **Title:** "How was your day?"
+- **Body:** "Looks like you haven't logged how you're feeling today. Make a quick log!" (Multiple title+body variants are a future enhancement — currently a 1-element `STAGE_1_VARIANTS` array on both platforms, so swapping in rotating phrases later is a localized change. Body intentionally no longer pulls `first_name`; the column is still selected in the Edge Function for future variants.)
 - **Tap action:** opens the app to the **Log Method screen** (`LogMethodScreen` — the Speak/Type selector, "2 bubbles"). Normal navigation, no special source tagging.
 - **Identifier:** deterministic per user-day, e.g. `daily-reminder-{YYYY-MM-DD}` (web push `tag`) / a derived int32 id (iOS, see below).
 
@@ -335,7 +336,8 @@ The spec below is the authoritative behavior. A few implementation choices to kn
 - **Fires:** 30 minutes after the stage-1 time (`reminder_time + 00:30`).
 - **Condition:** only if stage 1 was sent AND the user still has not logged a mood today (i.e. stage 1 was ignored/dismissed without producing a log).
 - **Replaces stage 1:** uses the **same identifier** as stage 1, so the OS/browser withdraws the stage-1 notification and shows this one in its place (iOS: re-using a `LocalNotifications` request `id` removes the prior delivered notification with that id; web: push payload `tag` matches, so `showNotification` replaces it).
-- **Body:** "Just say one to describe how you're feeling right now."
+- **Title:** "Just a quick check-in"
+- **Body:** "Just one word to describe your day."
 - **Tap action:** opens the app **directly into the Speak/voice recording flow, already running** — i.e. the exact same entry path as the existing Quick Log shortcut (`enterQuickLog()` → `tenor:quicklog` window event → `VoiceScreen` with `quickEntryRef = true`). The resulting log is tagged `source: 'quick'`, giving it the existing 7-day edit window (`lib/editGate.ts`) — no new edit-window logic needed.
 
 ### "Already logged" cancellation

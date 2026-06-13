@@ -33,10 +33,13 @@ const VAPID_SUBJECT =
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
-const STAGE_1_BODY = (firstName: string) =>
-  `Hello ${firstName}! You haven't logged your mood yet, want to jot down how your day went?`;
-const STAGE_2_BODY = () =>
-  "Just say one to describe how you're feeling right now.";
+// Copy mirrors src/lib/reminderScheduler.ts (iOS). Keep them in sync —
+// stages must read identically across platforms per the spec.
+const STAGE_1_TITLE = 'How was your day?';
+const STAGE_1_BODY =
+  "Looks like you haven't logged how you're feeling today. Make a quick log!";
+const STAGE_2_TITLE = 'Just a quick check-in';
+const STAGE_2_BODY = 'Just one word to describe your day.';
 
 const STAGE_GAP_MIN = 30;
 
@@ -132,10 +135,9 @@ Deno.serve(async () => {
         const loggedToday = await userLoggedOn(sb, p.id, now.dateKey);
         if (!loggedToday) {
           const subs = await fetchSubs(sb, p.id);
-          const body = STAGE_1_BODY(p.first_name?.trim() || 'there');
           await fanOut(sb, subs, {
-            title: 'Tenor',
-            body,
+            title: STAGE_1_TITLE,
+            body: STAGE_1_BODY,
             tag: `daily-reminder-${now.dateKey}`,
             data: { stage: 1 },
           });
@@ -151,8 +153,8 @@ Deno.serve(async () => {
         if (!loggedToday) {
           const subs = await fetchSubs(sb, p.id);
           await fanOut(sb, subs, {
-            title: 'Tenor',
-            body: STAGE_2_BODY(),
+            title: STAGE_2_TITLE,
+            body: STAGE_2_BODY,
             tag: `daily-reminder-${now.dateKey}`,
             data: { stage: 2 },
           });

@@ -45,21 +45,27 @@ const STAGE_GAP_MS = 30 * 60 * 1000;
 // far below 2^31 for the prototype's lifetime).
 const EPOCH = new Date('2026-01-01T00:00:00Z');
 
-// Body lookups intentionally written as 1-element arrays so adding
+// Title + body pairs per stage. Kept as 1-element arrays so adding
 // rotating variants later is a one-line change (per spec note).
-const STAGE_1_BODIES = [
-  (firstName: string) =>
-    `Hello ${firstName}! You haven't logged your mood yet, want to jot down how your day went?`,
-] as const;
-const STAGE_2_BODIES = [
-  () => "Just say one to describe how you're feeling right now.",
-] as const;
+interface ReminderCopy {
+  title: string;
+  body: string;
+}
+const STAGE_1_VARIANTS: readonly ReminderCopy[] = [
+  {
+    title: 'How was your day?',
+    body: "Looks like you haven't logged how you're feeling today. Make a quick log!",
+  },
+];
+const STAGE_2_VARIANTS: readonly ReminderCopy[] = [
+  {
+    title: 'Just a quick check-in',
+    body: 'Just one word to describe your day.',
+  },
+];
 
-function pickBody<T extends readonly ((firstName: string) => string)[]>(
-  variants: T,
-  firstName: string,
-): string {
-  return variants[0](firstName);
+function pickCopy(variants: readonly ReminderCopy[]): ReminderCopy {
+  return variants[0];
 }
 
 /** Whole days from EPOCH to the given local-midnight date. */
@@ -95,7 +101,10 @@ function dateAt(y: number, m: number, d: number, h: number, mi: number): Date {
 }
 
 interface ScheduleArgs {
-  profile: Pick<DbProfile, 'reminder_enabled' | 'reminder_time' | 'first_name'>;
+  // `first_name` is no longer used in the current copy variants but
+  // is kept in the wider DbProfile so future rotating phrases that
+  // greet by name can pull it without a signature change.
+  profile: Pick<DbProfile, 'reminder_enabled' | 'reminder_time'>;
   /** Used to skip scheduling today if a log already exists for today. */
   loggedTodayKey: string | null;
 }
@@ -129,7 +138,6 @@ export async function scheduleReminders(args: ScheduleArgs): Promise<void> {
   const perm = await LocalNotifications.requestPermissions();
   if (perm.display !== 'granted') return;
 
-  const firstName = args.profile.first_name?.trim() || 'there';
   const { h, m } = parseReminderTime(args.profile.reminder_time);
   const now = new Date();
 
@@ -160,19 +168,21 @@ export async function scheduleReminders(args: ScheduleArgs): Promise<void> {
     }
 
     if (stage1.getTime() > now.getTime()) {
+      const c = pickCopy(STAGE_1_VARIANTS);
       requests.push({
         id: notifId(stage1, 1),
-        title: 'Tenor',
-        body: pickBody(STAGE_1_BODIES, firstName),
+        title: c.title,
+        body: c.body,
         schedule: { at: stage1 },
         extra: { stage: 1 },
       });
     }
     if (stage2.getTime() > now.getTime()) {
+      const c = pickCopy(STAGE_2_VARIANTS);
       requests.push({
         id: notifId(stage1, 2),
-        title: 'Tenor',
-        body: pickBody(STAGE_2_BODIES, firstName),
+        title: c.title,
+        body: c.body,
         schedule: { at: stage2 },
         extra: { stage: 2 },
       });
