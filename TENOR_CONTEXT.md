@@ -152,12 +152,11 @@ A simple settings screen. No nested navigation — everything on one scrollable 
 - A "Link Google account" button — triggers Supabase's `linkIdentity` flow for Google OAuth
 - If Google is already linked, show "Google account linked" as a static label (no unlink option for now)
 
-**Reminders** (added Jun 12 2026 — see "Detailed Flow: Notification / Reminder System")
-- A section between "Linked accounts" and "Sign out" labeled "Reminders"
-- A toggle: "Daily reminder" (on/off) — maps to `profiles.reminder_enabled` (default `true`)
-- A time picker (native `<input type="time">`, styled to match `.acct-input`) — maps to `profiles.reminder_time` (default `20:00`). Disabled/grayed when the toggle above is off.
+**Reminders** (built Jun 12 2026 — see "Detailed Flow: Notification / Reminder System")
+- A section **below the Sign Out button**, behind a thin `.acct-divider` (revised from the original "between Linked accounts and Sign out" position — the sketch put App-Settings-style controls below the terminal CTA).
+- A toggle: "Daily reminder" (on/off) — maps to `profiles.reminder_enabled` (default `true`). Saves immediately on flip.
+- A time picker rendered as a Merriweather Light 24px **H2 with a dashed underline** (matches `.acct-name`'s edit affordance), with a transparent native `<input type="time">` absolutely positioned on top to catch taps and open the OS picker. Display uses 12h AM/PM via `formatDisplayTime()`; value persisted to Supabase stays 24h via `profiles.reminder_time` (default `20:00`). Disabled/dimmed when the toggle above is off. Saves on a 500ms debounce.
 - Helper copy under the time picker: "We'll check in if you haven't logged a mood by this time."
-- Saves immediately on change (no separate Save button needed — same debounce/auto-save pattern as other inline edits, or a lightweight Save button matching the Name section's pattern if auto-save isn't practical)
 
 **Sign out**
 - A sign out button at the bottom, clearly separated from the rest
@@ -300,9 +299,30 @@ Migration `supabase/migrations/0003_log_edits.sql`:
 
 ---
 
-## Detailed Flow: Notification / Reminder System — speced, not yet built (Jun 12 2026)
+## Detailed Flow: Notification / Reminder System — built Jun 12 2026 (commits `1299c68` → `5aa0c1e`)
 
-Two-stage daily reminder, escalating from a gentle nudge to a one-tap voice log. Configurable per-user via the "Reminders" section on the Account tab (see "Detailed Flow: Account Tab"). **Covers both iOS (Capacitor local notifications) and web/PWA (Web Push)** — both platforms must behave identically from the user's perspective.
+Two-stage daily reminder, escalating from a gentle nudge to a one-tap voice log. Configurable per-user via the "Reminders" section on the Account tab (see "Detailed Flow: Account Tab"). **Covers both iOS (Capacitor local notifications) and web/PWA (Web Push)** — both platforms behave identically from the user's perspective.
+
+### As-built notes (Jun 12 2026)
+
+The spec below is the authoritative behavior. A few implementation choices to know:
+
+- **iOS — distinct IDs, not same-id reschedule.** The spec flagged same-id vs distinct-id as an open question. Implementation went with distinct IDs (stage 1 = even, stage 2 = odd via `daysSinceEpoch(date) * 2 + (stage − 1)`) plus a `localNotificationReceived` foreground listener that strips stage 1 via `removeDeliveredNotifications` when stage 2 lands. Capacitor 8's same-id reschedule semantics don't document withdrawal of an already-delivered notification, so distinct IDs keep behavior on documented APIs. Field-test: if stage 1 lingers in Notification Center after stage 2 fires, swap to same-id — the body lookups are already keyed on stage so the rest of the file doesn't move.
+- **Reminders section position on AccountScreen.** Sits **below** the Sign Out button behind a divider (`.acct-divider`), not between Linked account and Sign Out. The earlier spec line in the Account Tab section has been corrected to match.
+- **Time picker rendered as H2.** A Merriweather Light 24px H2 with a dashed underline (matches `.acct-name`'s edit affordance) sits visually in place of an input box. A transparent native `<input type="time">` is absolutely positioned on top to catch taps and open the OS picker — avoids iOS's intrinsic time-input min-width that was overflowing the viewport. Display uses 12h AM/PM via `formatDisplayTime()`; the value persisted to Supabase stays 24h.
+- **Web Push subscription is build-time gated by `VITE_VAPID_PUBLIC_KEY`.** The GitHub Pages workflow (`.github/workflows/deploy.yml`) passes the secret through to `npm run build` — without it, `pushSubscribe.ensurePushSubscribed` no-ops cleanly. The private half lives only as the `VAPID_PRIVATE_KEY` Supabase Edge Function secret.
+- **Cron driver.** A `pg_cron` job (`send-reminders-every-5min`, every 5 minutes) calls the `send-reminders` Edge Function over `pg_net`. The function URL and a bearer cron secret are stored in Supabase Vault (`edge_send_reminders_url`, `edge_cron_secret`).
+
+### Files (as built)
+- `supabase/migrations/0006_reminders.sql` — profiles columns + `push_subscriptions` table + RLS.
+- `supabase/migrations/0007_reminder_cron.sql` — `pg_cron` + `pg_net` extensions + the every-5-min schedule.
+- `supabase/functions/send-reminders/index.ts` — Deno Edge Function, `npm:web-push@3`.
+- `src/lib/reminderScheduler.ts` — iOS scheduler + cancel + action listener.
+- `src/lib/pushSubscribe.ts` — service-worker register + `pushManager.subscribe` + upsert.
+- `public/sw.js` — `push` + `notificationclick` handlers.
+- `src/screens/AccountScreen.tsx` — Reminders UI.
+- `src/App.tsx` — wiring (auth → schedule, resume → reschedule, message bridge, cold-open consumer, cancel on `finalizeNewLog`).
+
 
 ### Stage 1 — Initial reminder
 - **Fires:** at `profiles.reminder_time` (default `20:00`), evaluated in the user's `profiles.timezone` (already populated at signup per "This weekend" log).
@@ -829,10 +849,15 @@ These are layout/data-model fixes to bring the existing built screen back in lin
 ### Following weekend — ~Sat 7 Jun → Fri 13 Jun
 - **Text classification model** — replace current client-side emotion lexicon with an in-house classifier (fine-tuned BERT or curated lexicon + lightweight sklearn model). Goal: no dependency on third-party LLMs for emotion detection.
 
-### NEXT UP (added Jun 12 2026) — Notification / Reminder System
-Full spec in "Detailed Flow: Notification / Reminder System" above. Two-stage daily reminder (gentle nudge → escalates to one-tap voice log after 30 min), configurable reminder time/toggle in the new Account tab "Reminders" section, covering **both iOS (Capacitor local notifications) and web/PWA (Web Push + Supabase Edge Function + pg_cron)**. New migration `0006_reminders.sql` adds `reminder_enabled`/`reminder_time`/`last_reminder_date`/`last_reminder_stage` to `profiles` and a new `push_subscriptions` table.
+### ~~NEXT UP — Notification / Reminder System~~ — **built Jun 12 2026** (`1299c68` → `5aa0c1e`)
+Full as-built notes in "Detailed Flow: Notification / Reminder System" above. Spec landed as designed for both platforms. Remaining follow-ups: see "Reminder system follow-ups" under "Also open" below.
 
 ### Also open (no fixed slot yet)
+- **Reminder system follow-ups:**
+  - Field-test stage-1 dismissal when stage-2 fires on iOS. If stage 1 lingers in Notification Center after stage 2 lands, swap `reminderScheduler.ts` to same-id reschedule (the body lookups are already keyed on stage so the swap is local).
+  - **Rotating phrase variants** for stage 1 — currently a 1-element array. Add 4–6 alternates and randomize per (user, date).
+  - **Onboarding moment** to introduce the reminder explicitly during signup, instead of relying on the toggle being default-on. Today the iOS permission prompt fires the first time the scheduler runs; an onboarding card explaining what reminders look like before that prompt would convert better.
+  - **Web push for iOS Safari** — currently `pushSubscribe.ts` no-ops on iOS WebView (native scheduler handles it). For iOS Safari installed as a PWA from the home screen, Web Push *does* work; verify the subscribe path fires cleanly there and add a test plan if not.
 - **Account tab** — at minimum a sign-out button + edit display name; foundation for Patient↔Therapist linking later.
 - **Preserve LogsScreen state** — lift D/W/M/Y position and period into `App` so closing a detail view doesn't reset scroll position.
 - **Polish pass** — FAB split animation, blob breathing on voice screen, screen transitions.
