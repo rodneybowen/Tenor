@@ -269,7 +269,7 @@ export default function AccountScreen({
         </section>
 
         {/* ── Linked account (full-width pill + unlink) ── */}
-        <section className="acct-section">
+        <section className="acct-section acct-section--last">
           <span className="acct-label">Linked account</span>
           {googleLinked === null ? (
             <p className="acct-meta">Checking…</p>
@@ -311,38 +311,6 @@ export default function AccountScreen({
           {linkError && <p className="acct-error">{linkError}</p>}
         </section>
 
-        {/* ── Reminders (daily check-in toggle + time) ── */}
-        <section className="acct-section acct-section--last acct-reminders">
-          <span className="acct-label">Reminders</span>
-
-          <div className="acct-reminder-row">
-            <span className="acct-reminder-rowlabel">Daily reminder</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={reminderEnabled}
-              aria-label="Daily reminder"
-              className={`acct-toggle${reminderEnabled ? ' is-on' : ''}`}
-              onClick={() => onReminderToggle(!reminderEnabled)}
-            >
-              <span className="acct-toggle-thumb" aria-hidden="true" />
-            </button>
-          </div>
-
-          <input
-            type="time"
-            className="acct-input acct-reminder-time"
-            value={reminderTime}
-            onChange={(e) => onReminderTimeChange(e.target.value)}
-            disabled={!reminderEnabled}
-            aria-label="Reminder time"
-          />
-          <p className="acct-meta acct-reminder-helper">
-            We'll check in if you haven't logged a mood by this time.
-          </p>
-          {reminderError && <p className="acct-error">{reminderError}</p>}
-        </section>
-
         {/* ── Sign out (full-width primary) ────────────── */}
         <div className="acct-signout-zone">
           <button
@@ -359,7 +327,64 @@ export default function AccountScreen({
             Sign Out
           </button>
         </div>
+
+        {/* ── Reminders (sits below Sign Out per the sketch). The
+              time renders as an H2 with a dashed underline, matching
+              the Name display affordance. A position-overlaid hidden
+              <input type="time"> captures taps so the OS opens its
+              native picker — no styling battles with the input chrome. */}
+        <hr className="acct-divider" />
+        <section className="acct-section acct-section--terminal acct-reminders">
+          <span className="acct-label">Reminders</span>
+
+          <div className="acct-reminder-row">
+            <span className="acct-reminder-rowlabel">Daily reminder</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={reminderEnabled}
+              aria-label="Daily reminder"
+              className={`acct-toggle${reminderEnabled ? ' is-on' : ''}`}
+              onClick={() => onReminderToggle(!reminderEnabled)}
+            >
+              <span className="acct-toggle-thumb" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div
+            className={`acct-reminder-time-field${reminderEnabled ? '' : ' is-disabled'}`}
+          >
+            <h2 className="acct-reminder-time-display" aria-hidden="true">
+              {formatDisplayTime(reminderTime)}
+            </h2>
+            <input
+              type="time"
+              className="acct-reminder-time-native"
+              value={reminderTime}
+              onChange={(e) => onReminderTimeChange(e.target.value)}
+              disabled={!reminderEnabled}
+              aria-label="Reminder time"
+            />
+          </div>
+          <p className="acct-meta acct-reminder-helper">
+            We'll check in if you haven't logged a mood by this time.
+          </p>
+          {reminderError && <p className="acct-error">{reminderError}</p>}
+        </section>
       </div>
     </div>
   );
+}
+
+/** 'HH:MM' (24h) → 'H:MM AM/PM' for the display H2. The hidden native
+ *  input continues to read/write the 24h value, so timezone math
+ *  upstream is unaffected. */
+function formatDisplayTime(hhmm: string): string {
+  const [hStr, mStr] = hhmm.split(':');
+  const h24 = Number(hStr);
+  const m = mStr ?? '00';
+  if (!Number.isFinite(h24)) return hhmm;
+  const period = h24 >= 12 ? 'PM' : 'AM';
+  const h12 = ((h24 + 11) % 12) + 1;
+  return `${h12}:${m} ${period}`;
 }

@@ -38,3 +38,6 @@ ios/.DS_Store
 *.njsproj
 *.sln
 *.sw?
+
+# Supabase CLI local cache (linked-project metadata, version files).
+supabase/.temp/

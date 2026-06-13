@@ -2791,6 +2791,19 @@ button {
 .acct-section.acct-section--last {
   margin-bottom: var(--space-cta);
 }
+/* Section pinned at the very bottom of the screen (e.g. Reminders,
+   which lives BELOW Sign Out per the sketch) — no trailing margin
+   so the scroll container's bottom padding can carry the rhythm. */
+.acct-section.acct-section--terminal {
+  margin-bottom: 0;
+}
+/* Divider between the Sign Out CTA and any sections that sit below
+   it on the Account screen. */
+.acct-divider {
+  margin: var(--space-section) 0;
+  border: 0;
+  border-top: 1px solid rgba(34, 34, 34, 0.12);
+}
 .acct-label {
   font-family: var(--font-sans);
   font-weight: 300;
@@ -2991,15 +3004,49 @@ button {
   font-size: 15px;
   color: var(--charcoal);
 }
-.acct-reminder-time {
-  /* Inherits .acct-input surface; native time pickers vary by OS but
-     this normalizes the box and right-aligns the digits to match. */
-  width: 100%;
+/* Time picker rendered as an H2 with a dashed underline (the same
+   "tap to edit" affordance .acct-name uses). An invisible native
+   <input type="time"> sits ON TOP of the H2, capturing taps so the
+   OS opens its native picker — no styling fight with the input
+   chrome, and no horizontal overflow from iOS's intrinsic min-width
+   on time inputs. */
+.acct-reminder-time-field {
+  position: relative;
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+}
+.acct-reminder-time-display {
+  /* Inherits font-family / size from the h2 element rule
+     (Merriweather Light 24px). Underline echoes .acct-name's
+     edit affordance. */
+  margin: 0;
+  padding-bottom: 2px;
+  border-bottom: 1.5px dashed rgba(34, 34, 34, 0.4);
   font-variant-numeric: tabular-nums;
 }
-.acct-reminder-time:disabled {
-  opacity: 0.45;
+.acct-reminder-time-native {
+  /* Stretches over the visible H2 to catch the tap. Fully transparent
+     so the H2 shows through; pointer-events stay on so iOS opens its
+     native time picker on tap. */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: transparent;
+  font: inherit;
+  opacity: 0;
+  cursor: pointer;
+}
+.acct-reminder-time-native:disabled {
   cursor: not-allowed;
+}
+.acct-reminder-time-field.is-disabled .acct-reminder-time-display {
+  opacity: 0.45;
 }
 .acct-reminder-helper {
   /* Inherits .acct-meta's muted color; just trims the top margin so
