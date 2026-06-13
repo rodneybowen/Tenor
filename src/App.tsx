@@ -38,6 +38,11 @@ import {
   consumeQuickLogQueryParam,
   initQuickLogCallback,
 } from './lib/quickLogTrigger';
+import {
+  cancelTodayReminders,
+  initReminderActionListener,
+  scheduleReminders,
+} from './lib/reminderScheduler';
 
 type Screen =
   | 'home'
@@ -211,6 +216,76 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => initQuickLogCallback(enterQuickLog), []);
+
+  // Reminder action listener (iOS only — no-op on web). Stage 1 (even
+  // id) takes the user to the Log Method screen. Stage 2 (odd id)
+  // dispatches the same `tenor:quicklog` window event the Quick Log
+  // shortcut uses, so the existing handler routes to VoiceScreen with
+  // quickEntryRef = true (source: 'quick' → 7-day edit window).
+  useEffect(
+    () =>
+      initReminderActionListener({
+        onStage1: () => setScreen('logMethod'),
+        onStage2: () => window.dispatchEvent(new Event('tenor:quicklog')),
+      }),
+    [],
+  );
+
+  // Native app-resume reschedule. When the app comes back to the
+  // foreground, the device clock / DST may have shifted and any logs
+  // since launch may have moved today's "logged" status — re-run the
+  // rolling-window scheduler so what's queued matches reality.
+  useEffect(() => {
+    if (auth.state.status !== 'authenticated') return;
+    let stop: (() => void) | null = null;
+    let cancelled = false;
+    void (async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) return;
+      const { App: CapApp } = await import('@capacitor/app');
+      const sub = await CapApp.addListener('resume', () => {
+        if (auth.state.status !== 'authenticated') return;
+        void scheduleReminders({
+          profile: auth.state.profile,
+          loggedTodayKey: logs.some((l) => l.dateKey === TODAY_KEY)
+            ? TODAY_KEY
+            : null,
+        });
+      });
+      if (cancelled) {
+        void sub.remove();
+        return;
+      }
+      stop = () => void sub.remove();
+    })();
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+    // Re-bind whenever the profile reference changes so the closure
+    // reads the latest reminder_enabled / reminder_time values.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.state.status, auth.state.status === 'authenticated' ? auth.state.profile : null]);
+
+  // Initial + setting-change reschedule. Runs on auth → authenticated
+  // and any time auth.state.profile changes (e.g. AccountScreen save).
+  // Also re-runs when `logs` toggles "logged today" — flipping from
+  // unlogged to logged needs to drop today's pending notifications.
+  useEffect(() => {
+    if (auth.state.status !== 'authenticated') return;
+    const loggedToday = logs.some((l) => l.dateKey === TODAY_KEY)
+      ? TODAY_KEY
+      : null;
+    void scheduleReminders({
+      profile: auth.state.profile,
+      loggedTodayKey: loggedToday,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    auth.state.status,
+    auth.state.status === 'authenticated' ? auth.state.profile : null,
+    logs.some((l) => l.dateKey === TODAY_KEY),
+  ]);
 
   // Native AppDelegate dispatches a window event when the app launches
   // via the Quick Log Control Center tile / AppShortcut. We listen
@@ -386,6 +461,15 @@ export default function App() {
    *  popup's onConfirm/onSkip handlers route to LogThreadScreen. For
    *  subsequent additions we go straight there since there's no popup. */
   function finalizeNewLog(entry: LogEntry, parentLogId: string | null) {
+    // Cycle done — today has a log. Cancel today's stage-1/2
+    // reminders so they don't fire later in the day. Fire-and-forget,
+    // no-ops on web. Stage 2 listener in scheduleReminders also
+    // strips a delivered stage 1 if one is still sitting in
+    // Notification Center.
+    if (entry.dateKey === TODAY_KEY) {
+      void cancelTodayReminders();
+    }
+
     if (!parentLogId) {
       // Standalone — same as before threads.
       setLogs((prev) => [...prev, entry]);

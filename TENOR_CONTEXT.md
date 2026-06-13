@@ -152,6 +152,13 @@ A simple settings screen. No nested navigation — everything on one scrollable 
 - A "Link Google account" button — triggers Supabase's `linkIdentity` flow for Google OAuth
 - If Google is already linked, show "Google account linked" as a static label (no unlink option for now)
 
+**Reminders** (added Jun 12 2026 — see "Detailed Flow: Notification / Reminder System")
+- A section between "Linked accounts" and "Sign out" labeled "Reminders"
+- A toggle: "Daily reminder" (on/off) — maps to `profiles.reminder_enabled` (default `true`)
+- A time picker (native `<input type="time">`, styled to match `.acct-input`) — maps to `profiles.reminder_time` (default `20:00`). Disabled/grayed when the toggle above is off.
+- Helper copy under the time picker: "We'll check in if you haven't logged a mood by this time."
+- Saves immediately on change (no separate Save button needed — same debounce/auto-save pattern as other inline edits, or a lightweight Save button matching the Name section's pattern if auto-save isn't practical)
+
 **Sign out**
 - A sign out button at the bottom, clearly separated from the rest
 - On tap: calls `supabase.auth.signOut()`, clears local state, returns user to the auth screen
@@ -290,6 +297,75 @@ Migration `supabase/migrations/0003_log_edits.sql`:
 - `Info.plist`: `NSMicrophoneUsageDescription`, `NSSpeechRecognitionUsageDescription` (the in-app voice flow needs these), `tenor` URL scheme. (`UIBackgroundModes: audio` + `NSSupportsLiveActivities` were added during the abandoned native-recording attempt; harmless to leave, unused now.)
 - Minimum Deployments **iOS 18.0** on both targets (ControlWidget is iOS 18+).
 - The dead native files (`QuickLogRecorder.swift`, `QuickLogAttributes.swift`, `QuickLogLiveActivity.swift`) may still sit in `ios/` from the abandoned attempt — they're unreferenced; remove from the target if you want a clean build, or ignore.
+
+---
+
+## Detailed Flow: Notification / Reminder System — speced, not yet built (Jun 12 2026)
+
+Two-stage daily reminder, escalating from a gentle nudge to a one-tap voice log. Configurable per-user via the "Reminders" section on the Account tab (see "Detailed Flow: Account Tab"). **Covers both iOS (Capacitor local notifications) and web/PWA (Web Push)** — both platforms must behave identically from the user's perspective.
+
+### Stage 1 — Initial reminder
+- **Fires:** at `profiles.reminder_time` (default `20:00`), evaluated in the user's `profiles.timezone` (already populated at signup per "This weekend" log).
+- **Condition:** only if `reminder_enabled = true` AND the user has not logged a mood yet for today (today = current date in the user's timezone).
+- **Body:** "Hello {first_name}! You haven't logged your mood yet, want to jot down how your day went?" — pulls `profiles.first_name`. (Multiple phrase variants are a future enhancement — ship with this single phrase for now, but write the body-text lookup as a small array/function of one item so swapping in variants later is a one-line change.)
+- **Tap action:** opens the app to the **Log Method screen** (`LogMethodScreen` — the Speak/Type selector, "2 bubbles"). Normal navigation, no special source tagging.
+- **Identifier:** deterministic per user-day, e.g. `daily-reminder-{YYYY-MM-DD}` (web push `tag`) / a derived int32 id (iOS, see below).
+
+### Stage 2 — Follow-up ("quick voice" escalation)
+- **Fires:** 30 minutes after the stage-1 time (`reminder_time + 00:30`).
+- **Condition:** only if stage 1 was sent AND the user still has not logged a mood today (i.e. stage 1 was ignored/dismissed without producing a log).
+- **Replaces stage 1:** uses the **same identifier** as stage 1, so the OS/browser withdraws the stage-1 notification and shows this one in its place (iOS: re-using a `LocalNotifications` request `id` removes the prior delivered notification with that id; web: push payload `tag` matches, so `showNotification` replaces it).
+- **Body:** "Just say one to describe how you're feeling right now."
+- **Tap action:** opens the app **directly into the Speak/voice recording flow, already running** — i.e. the exact same entry path as the existing Quick Log shortcut (`enterQuickLog()` → `tenor:quicklog` window event → `VoiceScreen` with `quickEntryRef = true`). The resulting log is tagged `source: 'quick'`, giving it the existing 7-day edit window (`lib/editGate.ts`) — no new edit-window logic needed.
+
+### "Already logged" cancellation
+The moment a log is inserted (any source — speak, type, select, quick), that day's reminder cycle is done:
+- **iOS:** cancel both scheduled local notifications for today's id(s) immediately after `insertLog` succeeds.
+- **Web:** no client-side cancel is possible for a server-sent push that hasn't fired yet, so the **server-side sender checks "does a log exist for today" immediately before sending** each stage — if yes, skip sending and mark the cycle done.
+
+### Per-user state tracking (new migration `0006_reminders.sql`)
+Add to `profiles`:
+- `reminder_enabled BOOLEAN NOT NULL DEFAULT true`
+- `reminder_time TIME NOT NULL DEFAULT '20:00:00'`
+- `last_reminder_date DATE` — the local date (user's timezone) this user's reminder cycle last ran for
+- `last_reminder_stage SMALLINT NOT NULL DEFAULT 0` — `0` = nothing sent yet today, `1` = stage 1 sent, `2` = stage 2 sent / cycle complete
+
+New table `push_subscriptions` (web push only):
+- `id uuid pk default gen_random_uuid()`
+- `user_id uuid references profiles(id) on delete cascade`
+- `endpoint text not null unique`
+- `p256dh text not null`, `auth text not null` (Web Push subscription keys)
+- `user_agent text`, `created_at timestamptz default now()`
+- RLS: users can insert/select/delete their own rows only.
+
+### iOS — `@capacitor/local-notifications`
+- New dependency: `@capacitor/local-notifications`. Request `LocalNotifications` permission once, at the same point onboarding already requests microphone/speech permissions (or immediately after, if that's cleaner).
+- **Scheduling model:** on app launch and on app resume (`App.addListener('resume', ...)`), AND whenever the user changes `reminder_enabled`/`reminder_time` on the Account screen, **reschedule a rolling 7-day window** of stage-1 and stage-2 notifications:
+  - For each of the next 7 days (including today, if `reminder_time` hasn't passed yet today), compute stage-1 fire time = that date @ `reminder_time` in the device's local time, stage-2 fire time = +30 min.
+  - **Deterministic int32 ids:** `id = daysSinceEpoch(date) * 2 + (stage - 1)` → stage 1 = even id, stage 2 = odd id. `daysSinceEpoch` = days since 2026-01-01 (fits comfortably in int32 for the app's lifetime).
+  - Schedule stage 2 with the **same notification content but `id` = stage-1's id ... ** — wait, see note below on same-id replacement vs. distinct ids; resolve this during implementation by testing actual iOS behavior (see "Open question" below).
+  - Skip scheduling a day entirely if a log already exists for that date (only relevant for "today" on (re)schedule).
+- **On successful `insertLog` for "today":** call `LocalNotifications.cancel({ notifications: [{ id: stage1IdForToday }, { id: stage2IdForToday }] })`.
+- **Notification tap routing:** listen for `LocalNotifications.addListener('localNotificationActionPerformed', ...)`. If the tapped notification's id is even (stage 1) → navigate to `LogMethodScreen`. If odd (stage 2) → dispatch the same `tenor:quicklog` event used by the Quick Log shortcut.
+
+**Open question for implementation (don't ask the user — pick the safer option and note the choice in the PR description):** iOS local notifications may not cleanly "replace" a delivered notification across two *different* scheduled requests with different ids the way same-id reschedule does. If same-id replacement across the 30-minute gap proves unreliable in testing, fall back to: schedule stage 2 with its own id, and on delivery of stage 2 also call `LocalNotifications.removeDeliveredNotifications` for stage 1's id (this requires the app to process the delivery in the background, which Capacitor supports via the same action-performed / received listeners). Ship whichever approach actually dismisses stage 1 when stage 2 arrives — visual replacement is the important UX outcome, the exact API path is an implementation detail.
+
+### Web — Web Push
+- **Service worker:** `public/sw.js` (plain JS, not bundled — Vite serves `public/` as-is). Handles:
+  - `push` event → `event.waitUntil(self.registration.showNotification(title, { body, tag, data: { stage } }))`
+  - `notificationclick` event → close the notification, then `clients.openWindow`/`clients.matchAll` + `focus` + `postMessage` to route: stage 1 → navigate to Log Method screen; stage 2 → dispatch the in-page equivalent of `tenor:quicklog` (post a message the running app listens for, same handler `App.tsx` already wires up for the native window event — add a `window.addEventListener('message', ...)` bridge that re-dispatches `tenor:quicklog`).
+- **VAPID keys:** generate once with the `web-push` npm package's `generateVAPIDKeys()`. Public key → `VITE_VAPID_PUBLIC_KEY` (client env, safe to expose). Private key → Supabase Edge Function secret (`VAPID_PRIVATE_KEY`), never in client code/repo.
+- **Subscription flow:** after login (and whenever notification permission is granted), client calls `Notification.requestPermission()`, then `registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: VITE_VAPID_PUBLIC_KEY })`, then upserts the resulting `{endpoint, keys.p256dh, keys.auth}` into `push_subscriptions` for the current user.
+- **Sender:** a Supabase Edge Function (`send-reminders`), invoked on a cron schedule via `pg_cron` **every 5 minutes**. For each profile with `reminder_enabled = true`:
+  1. Compute "now" in the profile's `timezone`.
+  2. If `last_reminder_date` != today (local) → reset `last_reminder_stage = 0`, `last_reminder_date = today`.
+  3. If `last_reminder_stage = 0` AND local time >= `reminder_time` → check for a log today; if none, send stage 1 to all of the user's `push_subscriptions` rows, set `last_reminder_stage = 1`.
+  4. Else if `last_reminder_stage = 1` AND local time >= `reminder_time + 00:30` → check for a log today; if none, send stage 2 (same `tag` as stage 1 so the browser replaces it), set `last_reminder_stage = 2`; if a log exists, just set `last_reminder_stage = 2` (cycle done, no send).
+  5. Use `web-push` npm package (works in Deno Edge Functions via npm specifier) signed with the VAPID keys. On a `410 Gone`/`404` response, delete that `push_subscriptions` row (expired subscription).
+
+### Out of scope for this pass
+- Multiple rotating phrase variants for stage 1 (spec'd as a single-item array for easy future extension — see Stage 1 above).
+- Android — not part of this prototype's target platforms; Capacitor `@capacitor/local-notifications` is cross-platform so it likely works, but no Android testing is in scope.
 
 ---
 
@@ -752,6 +828,9 @@ These are layout/data-model fixes to bring the existing built screen back in lin
 
 ### Following weekend — ~Sat 7 Jun → Fri 13 Jun
 - **Text classification model** — replace current client-side emotion lexicon with an in-house classifier (fine-tuned BERT or curated lexicon + lightweight sklearn model). Goal: no dependency on third-party LLMs for emotion detection.
+
+### NEXT UP (added Jun 12 2026) — Notification / Reminder System
+Full spec in "Detailed Flow: Notification / Reminder System" above. Two-stage daily reminder (gentle nudge → escalates to one-tap voice log after 30 min), configurable reminder time/toggle in the new Account tab "Reminders" section, covering **both iOS (Capacitor local notifications) and web/PWA (Web Push + Supabase Edge Function + pg_cron)**. New migration `0006_reminders.sql` adds `reminder_enabled`/`reminder_time`/`last_reminder_date`/`last_reminder_stage` to `profiles` and a new `push_subscriptions` table.
 
 ### Also open (no fixed slot yet)
 - **Account tab** — at minimum a sign-out button + edit display name; foundation for Patient↔Therapist linking later.
