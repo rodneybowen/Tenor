@@ -24,18 +24,22 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      # Supabase credentials must be present at BUILD time — Vite
-      # inlines `import.meta.env.VITE_*` values into the static bundle.
-      # Set both as repo secrets:
+      # Supabase credentials + Web Push VAPID public key must be present
+      # at BUILD time — Vite inlines `import.meta.env.VITE_*` values into
+      # the static bundle. Set all three as repo secrets:
       #   Settings → Secrets and variables → Actions → New repository secret
       #     • VITE_SUPABASE_URL        (Project URL, e.g. https://abc.supabase.co)
       #     • VITE_SUPABASE_ANON_KEY   (anon/public key — safe to ship)
+      #     • VITE_VAPID_PUBLIC_KEY    (public half of the Web Push pair;
+      #                                 private half is a Supabase Edge
+      #                                 Function secret, NEVER here)
       # If they're missing the build still succeeds, but the deployed app
-      # falls back to the in-memory mock data (no auth, no DB).
+      # falls back to in-memory mocks / web push subscription is skipped.
       - run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_VAPID_PUBLIC_KEY: ${{ secrets.VITE_VAPID_PUBLIC_KEY }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
