@@ -60,10 +60,18 @@ export default function AccountScreen({
   const [signingOut, setSigningOut] = useState(false);
 
   // ── Reminders: optimistic local state, persisted to profiles.
-  //    Toggle saves immediately; time input debounces ~500ms after the
-  //    last keystroke (mobile time pickers can fire onChange per digit).
-  const [reminderEnabled, setReminderEnabled] = useState<boolean>(
+  //    Toggles save immediately; time inputs debounce ~500ms after
+  //    the last keystroke (mobile time pickers can fire onChange per
+  //    digit). Stage 2 is conditionally rendered — when stage 1 is
+  //    off, the entire stage-2 control disappears (per spec: "If
+  //    stage 1 is off, there is no stage 2"). The stored stage-2
+  //    enabled value stays put in the DB so re-enabling stage 1
+  //    brings stage 2 back to its prior setting.
+  const [reminder1Enabled, setReminder1Enabled] = useState<boolean>(
     profile.reminder_enabled,
+  );
+  const [reminder2Enabled, setReminder2Enabled] = useState<boolean>(
+    profile.reminder_2_enabled,
   );
   const [reminderTime, setReminderTime] = useState<string>(
     // Strip the seconds for the native <input type="time"> (HH:MM).
@@ -79,7 +87,8 @@ export default function AccountScreen({
   const reminderTimeoutRef2 = useRef<number | null>(null);
 
   async function saveReminder(patch: {
-    reminderEnabled?: boolean;
+    reminder1Enabled?: boolean;
+    reminder2Enabled?: boolean;
     reminderTime?: string;
     reminderTime2?: string;
   }) {
@@ -92,9 +101,14 @@ export default function AccountScreen({
     }
   }
 
-  function onReminderToggle(next: boolean) {
-    setReminderEnabled(next);
-    void saveReminder({ reminderEnabled: next });
+  function onReminder1Toggle(next: boolean) {
+    setReminder1Enabled(next);
+    void saveReminder({ reminder1Enabled: next });
+  }
+
+  function onReminder2Toggle(next: boolean) {
+    setReminder2Enabled(next);
+    void saveReminder({ reminder2Enabled: next });
   }
 
   function onReminderTimeChange(next: string) {
@@ -349,72 +363,89 @@ export default function AccountScreen({
           </button>
         </div>
 
-        {/* ── Reminders (sits below Sign Out per the sketch). The
-              time renders as an H2 with a dashed underline, matching
-              the Name display affordance. A position-overlaid hidden
-              <input type="time"> captures taps so the OS opens its
-              native picker — no styling battles with the input chrome. */}
+        {/* ── Reminders (below the Sign Out CTA). Section header is
+              the H2 "Daily reminder" — no separate label above it.
+              Each stage has its own label + toggle row; the H3 time
+              field appears under the row only when that stage is on.
+              Stage 2's whole block is conditionally rendered: when
+              stage 1 is off, stage 2 doesn't show at all. */}
         <hr className="acct-divider" />
         <section className="acct-section acct-section--terminal acct-reminders">
-          <span className="acct-label">Reminders</span>
+          <h2 className="acct-reminders__title">Daily reminder</h2>
 
-          <div className="acct-reminder-row">
-            <span className="acct-reminder-rowlabel">Daily reminder</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={reminderEnabled}
-              aria-label="Daily reminder"
-              className={`acct-toggle${reminderEnabled ? ' is-on' : ''}`}
-              onClick={() => onReminderToggle(!reminderEnabled)}
-            >
-              <span className="acct-toggle-thumb" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* Stage 1 picker. */}
-          <div className="acct-reminder-time-group">
-            <span className="acct-reminder-time-caption">First reminder</span>
-            <div
-              className={`acct-reminder-time-field${reminderEnabled ? '' : ' is-disabled'}`}
-            >
-              <h2 className="acct-reminder-time-display" aria-hidden="true">
-                {formatDisplayTime(reminderTime)}
-              </h2>
-              <input
-                type="time"
-                className="acct-reminder-time-native"
-                value={reminderTime}
-                onChange={(e) => onReminderTimeChange(e.target.value)}
-                disabled={!reminderEnabled}
-                aria-label="First reminder time"
-              />
+          {/* ── Stage 1 — First reminder ── */}
+          <div className="acct-reminder-stage">
+            <div className="acct-reminder-stage__row">
+              <span className="acct-label">First reminder</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={reminder1Enabled}
+                aria-label="First reminder"
+                className={`acct-toggle${reminder1Enabled ? ' is-on' : ''}`}
+                onClick={() => onReminder1Toggle(!reminder1Enabled)}
+              >
+                <span className="acct-toggle-thumb" aria-hidden="true" />
+              </button>
             </div>
+            {reminder1Enabled && (
+              <div className="acct-reminder-time-field">
+                <h3 className="acct-reminder-time-display" aria-hidden="true">
+                  {formatDisplayTime(reminderTime)}
+                </h3>
+                <input
+                  type="time"
+                  className="acct-reminder-time-native"
+                  value={reminderTime}
+                  onChange={(e) => onReminderTimeChange(e.target.value)}
+                  aria-label="First reminder time"
+                />
+              </div>
+            )}
           </div>
 
-          {/* Stage 2 picker. */}
-          <div className="acct-reminder-time-group">
-            <span className="acct-reminder-time-caption">Follow-up reminder</span>
-            <div
-              className={`acct-reminder-time-field${reminderEnabled ? '' : ' is-disabled'}`}
-            >
-              <h2 className="acct-reminder-time-display" aria-hidden="true">
-                {formatDisplayTime(reminderTime2)}
-              </h2>
-              <input
-                type="time"
-                className="acct-reminder-time-native"
-                value={reminderTime2}
-                onChange={(e) => onReminderTime2Change(e.target.value)}
-                disabled={!reminderEnabled}
-                aria-label="Follow-up reminder time"
-              />
-            </div>
-          </div>
+          {/* Stage 2 is gated entirely on stage 1: if stage 1 is off,
+              there is no stage 2 — body copy + control both gone. */}
+          {reminder1Enabled && (
+            <>
+              <p className="acct-reminder-body">
+                If you miss the first notification, we could notify you
+                a second time
+              </p>
 
-          <p className="acct-meta acct-reminder-helper">
-            If you haven't logged by either time, we'll nudge you.
-          </p>
+              {/* ── Stage 2 — Follow-up reminder ── */}
+              <div className="acct-reminder-stage">
+                <div className="acct-reminder-stage__row">
+                  <span className="acct-label">Follow-up reminder</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={reminder2Enabled}
+                    aria-label="Follow-up reminder"
+                    className={`acct-toggle${reminder2Enabled ? ' is-on' : ''}`}
+                    onClick={() => onReminder2Toggle(!reminder2Enabled)}
+                  >
+                    <span className="acct-toggle-thumb" aria-hidden="true" />
+                  </button>
+                </div>
+                {reminder2Enabled && (
+                  <div className="acct-reminder-time-field">
+                    <h3 className="acct-reminder-time-display" aria-hidden="true">
+                      {formatDisplayTime(reminderTime2)}
+                    </h3>
+                    <input
+                      type="time"
+                      className="acct-reminder-time-native"
+                      value={reminderTime2}
+                      onChange={(e) => onReminderTime2Change(e.target.value)}
+                      aria-label="Follow-up reminder time"
+                    />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
           {reminderError && <p className="acct-error">{reminderError}</p>}
         </section>
       </div>

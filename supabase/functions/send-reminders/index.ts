@@ -45,7 +45,10 @@ interface ProfileRow {
   id: string;
   first_name: string | null;
   timezone: string | null;
+  /** Stage 1 enabled — master switch; when false, no stage 2 either. */
   reminder_enabled: boolean;
+  /** Stage 2 opt-in (migration 0009); consulted only when stage 1 on. */
+  reminder_2_enabled: boolean;
   reminder_time: string; // 'HH:MM:SS' — stage 1
   reminder_time_2: string; // 'HH:MM:SS' — stage 2 (user-picked)
   last_reminder_date: string | null;
@@ -93,7 +96,7 @@ Deno.serve(async () => {
   const { data: profiles, error } = await sb
     .from('profiles')
     .select(
-      'id, first_name, timezone, reminder_enabled, reminder_time, reminder_time_2, last_reminder_date, last_reminder_stage',
+      'id, first_name, timezone, reminder_enabled, reminder_2_enabled, reminder_time, reminder_time_2, last_reminder_date, last_reminder_stage',
     )
     .eq('reminder_enabled', true)
     .is('deleted_at', null);
@@ -149,18 +152,24 @@ Deno.serve(async () => {
           advanced++;
         }
       } else if (stage === 1 && stage2Due) {
-        const loggedToday = await userLoggedOn(sb, p.id, now.dateKey);
-        if (!loggedToday) {
-          const subs = await fetchSubs(sb, p.id);
-          await fanOut(sb, subs, {
-            title: STAGE_2_TITLE,
-            body: STAGE_2_BODY,
-            tag: `daily-reminder-${now.dateKey}`,
-            data: { stage: 2 },
-          });
-          sent += subs.length;
+        // Gate the send on the per-stage opt-in. When the user has
+        // turned stage 2 off, we still advance the cycle counter so
+        // we don't keep re-evaluating it for the rest of the day.
+        if (p.reminder_2_enabled) {
+          const loggedToday = await userLoggedOn(sb, p.id, now.dateKey);
+          if (!loggedToday) {
+            const subs = await fetchSubs(sb, p.id);
+            await fanOut(sb, subs, {
+              title: STAGE_2_TITLE,
+              body: STAGE_2_BODY,
+              tag: `daily-reminder-${now.dateKey}`,
+              data: { stage: 2 },
+            });
+            sent += subs.length;
+          }
         }
-        // Whether or not we sent, cycle is done for today.
+        // Whether or not we sent (or whether stage 2 was opted out),
+        // cycle is done for today.
         await sb
           .from('profiles')
           .update({ last_reminder_stage: 2 })

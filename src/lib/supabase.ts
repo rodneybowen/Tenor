@@ -60,8 +60,14 @@ export interface DbProfile {
   first_name: string | null;
   last_name: string | null;
   timezone: string | null;
-  /** Reminder/notification preferences — see migration 0006. */
+  /** Stage-1 reminder switch (migration 0006). After 0009 this is
+   *  reinterpreted as "stage 1 enabled" — when false, the whole
+   *  cycle is off (no stage 2 fires either). Column kept under its
+   *  original name to avoid the rename churn. */
   reminder_enabled: boolean;
+  /** Stage-2 reminder opt-in (migration 0009). Only consulted when
+   *  `reminder_enabled` is true. Default true on existing rows. */
+  reminder_2_enabled: boolean;
   /** Stage-1 fire time. ISO HH:MM:SS in `timezone`. Default '20:00:00'. */
   reminder_time: string;
   /** Stage-2 fire time. ISO HH:MM:SS in `timezone`. Default '20:30:00'
@@ -281,7 +287,10 @@ export async function updateName(
 export async function updateReminderSettings(
   userId: string,
   patch: {
-    reminderEnabled?: boolean;
+    /** Stage-1 enabled (`reminder_enabled` in the DB). */
+    reminder1Enabled?: boolean;
+    /** Stage-2 enabled (`reminder_2_enabled` in the DB, migration 0009). */
+    reminder2Enabled?: boolean;
     reminderTime?: string;
     reminderTime2?: string;
   },
@@ -289,7 +298,8 @@ export async function updateReminderSettings(
   const sb = requireClient();
   const update: Record<string, unknown> = {};
   const normalize = (t: string) => (/^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t);
-  if (patch.reminderEnabled !== undefined) update.reminder_enabled = patch.reminderEnabled;
+  if (patch.reminder1Enabled !== undefined) update.reminder_enabled = patch.reminder1Enabled;
+  if (patch.reminder2Enabled !== undefined) update.reminder_2_enabled = patch.reminder2Enabled;
   if (patch.reminderTime !== undefined) {
     // Normalize HH:MM → HH:MM:00 so Postgres TIME comparisons stay tidy.
     update.reminder_time = normalize(patch.reminderTime);

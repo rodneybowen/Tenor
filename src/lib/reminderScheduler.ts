@@ -100,9 +100,15 @@ interface ScheduleArgs {
   // `first_name` is no longer used in the current copy variants but
   // is kept in the wider DbProfile so future rotating phrases that
   // greet by name can pull it without a signature change.
+  // `reminder_enabled` = stage 1 enabled (master); when false, no
+  // stage 2 either. `reminder_2_enabled` is the stage-2 opt-in,
+  // consulted only when stage 1 is on.
   profile: Pick<
     DbProfile,
-    'reminder_enabled' | 'reminder_time' | 'reminder_time_2'
+    | 'reminder_enabled'
+    | 'reminder_2_enabled'
+    | 'reminder_time'
+    | 'reminder_time_2'
   >;
   /** Used to skip scheduling today if a log already exists for today. */
   loggedTodayKey: string | null;
@@ -187,7 +193,13 @@ export async function scheduleReminders(args: ScheduleArgs): Promise<void> {
         extra: { stage: 1 },
       });
     }
-    if (stage2.getTime() > now.getTime()) {
+    // Stage 2 only schedules when the user has opted in. (Stage 1
+    // being enabled is the outer guard — if it weren't, we'd have
+    // returned at the top of this function.)
+    if (
+      args.profile.reminder_2_enabled &&
+      stage2.getTime() > now.getTime()
+    ) {
       const c = pickCopy(STAGE_2_VARIANTS);
       requests.push({
         id: notifId(stage2, 2),

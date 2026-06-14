@@ -2993,31 +2993,35 @@ button {
 .acct-unlink:disabled { opacity: 0.5; cursor: default; }
 
 /* ── Reminders section ─────────────────────────────
-   Sits between Linked account and the Sign Out CTA.
-   Layout: rowlabel + toggle on one line, time input on its own row,
-   helper meta beneath. Spacing inherits the section-level tokens. */
+   "Daily reminder" H2 owns the section header (no separate label
+   above it). Each stage is a label-plus-toggle row, with the H3
+   time field appearing under the row only when that stage is on.
+   Stage 2 is conditionally rendered in JSX — when stage 1 is off,
+   the entire stage-2 block (incl. its body copy) is gone. */
 .acct-reminders {
-  /* Tighten the row gap a touch — toggle row + input + helper feel
-     more like a single control cluster than three separate items. */
-  gap: var(--space-snug);
+  /* Larger inter-control gap than the default section since each
+     stage block already has its own internal rhythm. */
+  gap: 18px;
 }
-.acct-reminder-row {
+.acct-reminders__title {
+  /* Inherits Merriweather Light 24px from the h2 element rule. */
+  margin: 0;
+}
+.acct-reminder-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.acct-reminder-stage__row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
-.acct-reminder-rowlabel {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  color: var(--charcoal);
-}
-/* Time picker rendered as an H2 with a dashed underline (the same
-   "tap to edit" affordance .acct-name uses). An invisible native
-   <input type="time"> sits ON TOP of the H2, capturing taps so the
-   OS opens its native picker — no styling fight with the input
-   chrome, and no horizontal overflow from iOS's intrinsic min-width
-   on time inputs. */
+/* Inline-flex container so the dashed underline is exactly as wide
+   as the H3 text — no full-width line under empty space. The
+   transparent <input type="time"> overlays the H3 to catch the tap
+   and trigger the OS picker. */
 .acct-reminder-time-field {
   position: relative;
   display: inline-block;
@@ -3025,17 +3029,16 @@ button {
   max-width: 100%;
 }
 .acct-reminder-time-display {
-  /* Inherits font-family / size from the h2 element rule
-     (Merriweather Light 24px). Underline echoes .acct-name's
-     edit affordance. */
+  /* Inherits Merriweather Light 18px from the h3 element rule.
+     Dashed underline echoes .acct-name's edit affordance. */
   margin: 0;
   padding-bottom: 2px;
   border-bottom: 1.5px dashed rgba(34, 34, 34, 0.4);
   font-variant-numeric: tabular-nums;
 }
 .acct-reminder-time-native {
-  /* Stretches over the visible H2 to catch the tap. Fully transparent
-     so the H2 shows through; pointer-events stay on so iOS opens its
+  /* Stretches over the visible H3 to catch the tap. Transparent so
+     the H3 shows through; pointer-events stay on so iOS opens its
      native time picker on tap. */
   position: absolute;
   inset: 0;
@@ -3050,33 +3053,17 @@ button {
   opacity: 0;
   cursor: pointer;
 }
-.acct-reminder-time-native:disabled {
-  cursor: not-allowed;
-}
-.acct-reminder-time-field.is-disabled .acct-reminder-time-display {
-  opacity: 0.45;
-}
-/* Sub-section wrapping each time picker — caption above + H2 field
-   below. Lets stage 1 and stage 2 read as two distinct controls
-   inside the same Reminders section. */
-.acct-reminder-time-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.acct-reminder-time-caption {
+/* Body copy between the two stages — Montserrat Regular 16px per
+   the typography spec. Sits centered-vertically between stage 1's
+   time picker and stage 2's row. */
+.acct-reminder-body {
+  margin: 0;
   font-family: var(--font-sans);
-  font-weight: 300;
-  font-size: 13px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.4;
   color: var(--charcoal);
-  opacity: 0.55;
-}
-.acct-reminder-helper {
-  /* Inherits .acct-meta's muted color; just trims the top margin so
-     it reads as a caption for the time picker above. */
-  margin-top: 0;
+  opacity: 0.75;
 }
 
 /* iOS-style toggle pill, tuned to neutrals (no brand-color fill —
