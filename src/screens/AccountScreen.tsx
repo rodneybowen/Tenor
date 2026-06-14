@@ -69,12 +69,19 @@ export default function AccountScreen({
     // Strip the seconds for the native <input type="time"> (HH:MM).
     profile.reminder_time.slice(0, 5),
   );
+  const [reminderTime2, setReminderTime2] = useState<string>(
+    profile.reminder_time_2.slice(0, 5),
+  );
   const [reminderError, setReminderError] = useState<string | null>(null);
+  // One debounce timer per picker, so stage-1 and stage-2 saves don't
+  // cancel each other when the user adjusts them in quick succession.
   const reminderTimeoutRef = useRef<number | null>(null);
+  const reminderTimeoutRef2 = useRef<number | null>(null);
 
   async function saveReminder(patch: {
     reminderEnabled?: boolean;
     reminderTime?: string;
+    reminderTime2?: string;
   }) {
     setReminderError(null);
     try {
@@ -101,11 +108,25 @@ export default function AccountScreen({
     }, 500);
   }
 
+  function onReminderTime2Change(next: string) {
+    setReminderTime2(next);
+    if (reminderTimeoutRef2.current !== null) {
+      window.clearTimeout(reminderTimeoutRef2.current);
+    }
+    reminderTimeoutRef2.current = window.setTimeout(() => {
+      reminderTimeoutRef2.current = null;
+      void saveReminder({ reminderTime2: next });
+    }, 500);
+  }
+
   // Flush any pending debounced time-picker save if the screen unmounts.
   useEffect(() => {
     return () => {
       if (reminderTimeoutRef.current !== null) {
         window.clearTimeout(reminderTimeoutRef.current);
+      }
+      if (reminderTimeoutRef2.current !== null) {
+        window.clearTimeout(reminderTimeoutRef2.current);
       }
     };
   }, []);
@@ -351,23 +372,48 @@ export default function AccountScreen({
             </button>
           </div>
 
-          <div
-            className={`acct-reminder-time-field${reminderEnabled ? '' : ' is-disabled'}`}
-          >
-            <h2 className="acct-reminder-time-display" aria-hidden="true">
-              {formatDisplayTime(reminderTime)}
-            </h2>
-            <input
-              type="time"
-              className="acct-reminder-time-native"
-              value={reminderTime}
-              onChange={(e) => onReminderTimeChange(e.target.value)}
-              disabled={!reminderEnabled}
-              aria-label="Reminder time"
-            />
+          {/* Stage 1 picker. */}
+          <div className="acct-reminder-time-group">
+            <span className="acct-reminder-time-caption">First reminder</span>
+            <div
+              className={`acct-reminder-time-field${reminderEnabled ? '' : ' is-disabled'}`}
+            >
+              <h2 className="acct-reminder-time-display" aria-hidden="true">
+                {formatDisplayTime(reminderTime)}
+              </h2>
+              <input
+                type="time"
+                className="acct-reminder-time-native"
+                value={reminderTime}
+                onChange={(e) => onReminderTimeChange(e.target.value)}
+                disabled={!reminderEnabled}
+                aria-label="First reminder time"
+              />
+            </div>
           </div>
+
+          {/* Stage 2 picker. */}
+          <div className="acct-reminder-time-group">
+            <span className="acct-reminder-time-caption">Follow-up reminder</span>
+            <div
+              className={`acct-reminder-time-field${reminderEnabled ? '' : ' is-disabled'}`}
+            >
+              <h2 className="acct-reminder-time-display" aria-hidden="true">
+                {formatDisplayTime(reminderTime2)}
+              </h2>
+              <input
+                type="time"
+                className="acct-reminder-time-native"
+                value={reminderTime2}
+                onChange={(e) => onReminderTime2Change(e.target.value)}
+                disabled={!reminderEnabled}
+                aria-label="Follow-up reminder time"
+              />
+            </div>
+          </div>
+
           <p className="acct-meta acct-reminder-helper">
-            We'll check in if you haven't logged a mood by this time.
+            If you haven't logged by either time, we'll nudge you.
           </p>
           {reminderError && <p className="acct-error">{reminderError}</p>}
         </section>

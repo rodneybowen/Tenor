@@ -3056,6 +3056,23 @@ button {
 .acct-reminder-time-field.is-disabled .acct-reminder-time-display {
   opacity: 0.45;
 }
+/* Sub-section wrapping each time picker — caption above + H2 field
+   below. Lets stage 1 and stage 2 read as two distinct controls
+   inside the same Reminders section. */
+.acct-reminder-time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.acct-reminder-time-caption {
+  font-family: var(--font-sans);
+  font-weight: 300;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--charcoal);
+  opacity: 0.55;
+}
 .acct-reminder-helper {
   /* Inherits .acct-meta's muted color; just trims the top margin so
      it reads as a caption for the time picker above. */

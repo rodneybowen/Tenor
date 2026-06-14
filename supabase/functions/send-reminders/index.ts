@@ -41,14 +41,13 @@ const STAGE_1_BODY =
 const STAGE_2_TITLE = 'Just a quick check-in';
 const STAGE_2_BODY = 'Just one word to describe your day.';
 
-const STAGE_GAP_MIN = 30;
-
 interface ProfileRow {
   id: string;
   first_name: string | null;
   timezone: string | null;
   reminder_enabled: boolean;
-  reminder_time: string; // 'HH:MM:SS'
+  reminder_time: string; // 'HH:MM:SS' — stage 1
+  reminder_time_2: string; // 'HH:MM:SS' — stage 2 (user-picked)
   last_reminder_date: string | null;
   last_reminder_stage: number;
 }
@@ -94,7 +93,7 @@ Deno.serve(async () => {
   const { data: profiles, error } = await sb
     .from('profiles')
     .select(
-      'id, first_name, timezone, reminder_enabled, reminder_time, last_reminder_date, last_reminder_stage',
+      'id, first_name, timezone, reminder_enabled, reminder_time, reminder_time_2, last_reminder_date, last_reminder_stage',
     )
     .eq('reminder_enabled', true)
     .is('deleted_at', null);
@@ -112,6 +111,7 @@ Deno.serve(async () => {
     try {
       const now = localNow(p.timezone);
       const reminderMin = reminderMinutes(p.reminder_time);
+      const reminderMin2 = reminderMinutes(p.reminder_time_2);
 
       let stage = p.last_reminder_stage;
 
@@ -129,7 +129,7 @@ Deno.serve(async () => {
       }
 
       const stage1Due = now.minutes >= reminderMin;
-      const stage2Due = now.minutes >= reminderMin + STAGE_GAP_MIN;
+      const stage2Due = now.minutes >= reminderMin2;
 
       if (stage === 0 && stage1Due) {
         const loggedToday = await userLoggedOn(sb, p.id, now.dateKey);

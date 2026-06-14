@@ -36,10 +36,6 @@
 import type { DbProfile } from './supabase';
 import { TODAY_KEY } from '../data/mockLogs';
 
-// 30 minutes between the two stages. Kept named so a future
-// "Reminder cadence" setting can swap it for a per-user value.
-const STAGE_GAP_MS = 30 * 60 * 1000;
-
 // Days-since-epoch anchor. Picked so present-day IDs sit comfortably
 // inside int32 (a year ≈ 365 days; *2 for the two stages keeps us
 // far below 2^31 for the prototype's lifetime).
@@ -104,7 +100,10 @@ interface ScheduleArgs {
   // `first_name` is no longer used in the current copy variants but
   // is kept in the wider DbProfile so future rotating phrases that
   // greet by name can pull it without a signature change.
-  profile: Pick<DbProfile, 'reminder_enabled' | 'reminder_time'>;
+  profile: Pick<
+    DbProfile,
+    'reminder_enabled' | 'reminder_time' | 'reminder_time_2'
+  >;
   /** Used to skip scheduling today if a log already exists for today. */
   loggedTodayKey: string | null;
 }
@@ -138,7 +137,8 @@ export async function scheduleReminders(args: ScheduleArgs): Promise<void> {
   const perm = await LocalNotifications.requestPermissions();
   if (perm.display !== 'granted') return;
 
-  const { h, m } = parseReminderTime(args.profile.reminder_time);
+  const t1 = parseReminderTime(args.profile.reminder_time);
+  const t2 = parseReminderTime(args.profile.reminder_time_2);
   const now = new Date();
 
   const requests: Array<{
@@ -156,10 +156,20 @@ export async function scheduleReminders(args: ScheduleArgs): Promise<void> {
       target.getFullYear(),
       target.getMonth(),
       target.getDate(),
-      h,
-      m,
+      t1.h,
+      t1.m,
     );
-    const stage2 = new Date(stage1.getTime() + STAGE_GAP_MS);
+    // Stage 2 is now its own user-picked wall-clock time on the same
+    // local date — no implicit +30min. If the user sets stage 2
+    // earlier than stage 1, it just fires earlier; the scheduler
+    // doesn't enforce ordering.
+    const stage2 = dateAt(
+      target.getFullYear(),
+      target.getMonth(),
+      target.getDate(),
+      t2.h,
+      t2.m,
+    );
 
     // Skip today if the user already logged today (only meaningful
     // for dayOffset === 0; future days obviously can't have logs).
@@ -180,7 +190,7 @@ export async function scheduleReminders(args: ScheduleArgs): Promise<void> {
     if (stage2.getTime() > now.getTime()) {
       const c = pickCopy(STAGE_2_VARIANTS);
       requests.push({
-        id: notifId(stage1, 2),
+        id: notifId(stage2, 2),
         title: c.title,
         body: c.body,
         schedule: { at: stage2 },

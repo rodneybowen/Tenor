@@ -62,8 +62,11 @@ export interface DbProfile {
   timezone: string | null;
   /** Reminder/notification preferences — see migration 0006. */
   reminder_enabled: boolean;
-  /** ISO HH:MM:SS in `timezone`. Defaulted to '20:00:00' at signup. */
+  /** Stage-1 fire time. ISO HH:MM:SS in `timezone`. Default '20:00:00'. */
   reminder_time: string;
+  /** Stage-2 fire time. ISO HH:MM:SS in `timezone`. Default '20:30:00'
+   *  (the old hardcoded +30min gap, now user-configurable per 0008). */
+  reminder_time_2: string;
   /** Server-cycle tracking — clients don't touch these directly. */
   last_reminder_date: string | null;
   last_reminder_stage: number;
@@ -277,15 +280,22 @@ export async function updateName(
  *  `reminderTime` should be 'HH:MM' or 'HH:MM:SS' (Postgres TIME). */
 export async function updateReminderSettings(
   userId: string,
-  patch: { reminderEnabled?: boolean; reminderTime?: string },
+  patch: {
+    reminderEnabled?: boolean;
+    reminderTime?: string;
+    reminderTime2?: string;
+  },
 ): Promise<DbProfile> {
   const sb = requireClient();
   const update: Record<string, unknown> = {};
+  const normalize = (t: string) => (/^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t);
   if (patch.reminderEnabled !== undefined) update.reminder_enabled = patch.reminderEnabled;
   if (patch.reminderTime !== undefined) {
     // Normalize HH:MM → HH:MM:00 so Postgres TIME comparisons stay tidy.
-    const t = patch.reminderTime;
-    update.reminder_time = /^\d{2}:\d{2}$/.test(t) ? `${t}:00` : t;
+    update.reminder_time = normalize(patch.reminderTime);
+  }
+  if (patch.reminderTime2 !== undefined) {
+    update.reminder_time_2 = normalize(patch.reminderTime2);
   }
   const { data, error } = await sb
     .from('profiles')
