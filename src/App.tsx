@@ -11,6 +11,7 @@ import EmotionReviewScreen from './screens/EmotionReviewScreen';
 import LogDetailScreen from './screens/LogDetailScreen';
 import LogsScreen from './screens/LogsScreen';
 import AuthScreen from './screens/AuthScreen';
+import IntroSplash from './components/IntroSplash';
 import AccountScreen from './screens/AccountScreen';
 import ProfileSetupScreen from './screens/ProfileSetupScreen';
 import { ALL_LOGS, TODAY_KEY, formatClock, type LogEntry } from './data/mockLogs';
@@ -86,6 +87,24 @@ export default function App() {
     auth.state.status === 'unauthenticated' ||
     auth.state.status === 'needs-profile';
   const isGuest = auth.state.status === 'guest';
+
+  // IntroSplash gating. Plays on every transition INTO an auth
+  // screen state — cold load, page refresh, and the post-signOut
+  // flip from 'authenticated' → 'unauthenticated'. Internal
+  // AuthScreen tab switches don't change auth.state.status, so the
+  // effect doesn't refire. No persistence (sessionStorage etc.) —
+  // intentionally replays on every browser refresh per spec.
+  const [showIntro, setShowIntro] = useState<boolean>(false);
+  const prevAuthScreenRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    const inAuthScreen = screenIsAuth;
+    const prev = prevAuthScreenRef.current;
+    prevAuthScreenRef.current = inAuthScreen;
+    // Trigger on the rising edge: false/null → true.
+    if (inAuthScreen && prev !== true) {
+      setShowIntro(true);
+    }
+  }, [screenIsAuth]);
 
   const [screen, setScreen] = useState<Screen>('home');
   // Initial logs state precedence:
@@ -697,6 +716,10 @@ export default function App() {
             onComplete={() => auth.refresh()}
           />
         )}
+        {/* Splash overlays the auth UI — the wordmark / form are
+            already in the DOM underneath so the FLIP target rect
+            resolves immediately on the lottie's onComplete. */}
+        {showIntro && <IntroSplash onDone={() => setShowIntro(false)} />}
       </div>
     );
   }

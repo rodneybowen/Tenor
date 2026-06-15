@@ -299,6 +299,43 @@ Migration `supabase/migrations/0003_log_edits.sql`:
 
 ---
 
+## Detailed Flow: Logo Intro Animation (Splash) — built Jun 15 2026
+
+### As-built notes (Jun 15 2026)
+- Component: `src/components/IntroSplash.tsx` — overlays a fixed full-viewport blank aurora + grain on top of an already-rendered `AuthScreen` (the wordmark `<img>` is the FLIP target; renders from the start).
+- Assets: `public/animations/intro.lottie` (compressed, primary) + `public/animations/intro.json` (uncompressed, load-error fallback). Filenames held in `INTRO_LOTTIE_SRC` + `INTRO_JSON_SRC` constants — swap by editing those two lines.
+- Library: `@lottiefiles/dotlottie-react ^0.19.4`. The React component doesn't expose `onComplete` / `onLoadError` as props; we wire both via `dotLottieRefCallback` → `instance.addEventListener('complete' | 'loadError', …)`.
+- Animation: lottie centered at 180×180, autoplay, no loop. On `complete`, the lottie's wrapper div is measured against `.auth-wordmark img` via `getBoundingClientRect()`; FLIP transform = `translate(dx, dy) scale(targetH / fromH)` with `transform-origin: top left`, 500ms `cubic-bezier(.4, 0, .2, 1)`. Double-RAF before applying the transformed value to guarantee the transition commits.
+- Trigger: `App.tsx` keeps a `prevAuthScreenRef` + `showIntro` state; an effect with `screenIsAuth` as the dep fires `setShowIntro(true)` on the rising edge (false→true). This covers cold load, refresh, and post-`signOut` — but NOT internal AuthScreen tab switches (those don't change `auth.state.status`).
+- Safety net: 8s timer in IntroSplash hands off via `onDone` if the lottie never reports `complete` (network hang, malformed asset).
+- Aurora: dedicated `.intro-splash__blob--{a,b,c,d}` rules reuse the `--blob-*` color tokens but **without** the `drift` keyframes — "blank gradient," per spec.
+
+---
+
+## Detailed Flow: Logo Intro Animation (Splash) — original spec
+
+Every time a **logged-out** user lands on `AuthScreen` — first load, refresh, or immediately after signing out — a one-time logo animation plays on a full-screen blank gradient, then the logo shrinks and settles into the exact spot where the static wordmark already lives on `AuthScreen` (`.auth-wordmark img`, `full-logo-dark.svg`, 40px height, centered, `margin: 8px 0 28px`).
+
+### Trigger condition
+- Plays on every **mount** of `AuthScreen` while there is no authenticated user — i.e. cold load, page refresh, and the transition back to `AuthScreen` right after `signOut()`.
+- Does **not** replay on internal state changes that don't remount `AuthScreen` (e.g. switching between the Sign In / Sign Up tabs) — mount-only, via an empty-dependency effect or a `key` that only changes on the logged-out↔logged-in transition.
+- No `sessionStorage`/`localStorage` gating — this is intentionally "every time," per the user.
+
+### Visual sequence
+1. **Background:** full-viewport blank gradient — reuse the existing `--blob-*` aurora tokens (`--blob-blue #DDE7FF`, `--blob-green #D7FFE2`, `--blob-yellow #FFF5C6`, `--blob-coral #FFDFDF`) and the `.grain` texture overlay already used elsewhere, but **static** (no drifting `.blob-a/b/c/d` animation) — "blank gradient," not the busy animated home backdrop.
+2. **Logo animation:** the provided `.lottie`/`.json` animation plays once, centered on screen, at a large size (e.g. ~160–200px) — autoplay, no loop, no controls.
+3. **On animation-complete:** the logo animates (CSS transition, ~400–600ms, ease-out) from its large centered position/size down to the exact size and position of `.auth-wordmark img` (40px height, centered horizontally, sitting at the top of `.auth-shell` with `margin: 8px 0 28px` + safe-area padding). Use a FLIP-style transform (measure both rects with `getBoundingClientRect`, animate `transform: translate() scale()` from the splash rect to the target rect) so it's a true "shrink and move," not a crossfade.
+4. **Handoff:** once the shrink/move transition finishes, the splash overlay (gradient + animated logo) unmounts, revealing the normal `AuthScreen` underneath — including its existing static `.auth-wordmark img` and the auth card (sign in/up form), which fades/slides in per whatever entrance treatment `AuthScreen` already has (none currently — a simple opacity fade-in is fine).
+
+### Assets
+- User will provide a `.lottie` file and a `.json` file of the same animation (the `.lottie` is the compressed/preferred format; `.json` as fallback/source). Both go in `public/animations/` (create the folder) — exact filenames TBD when provided, but the component should reference them by a named constant so swapping is trivial.
+- Library: `@lottiefiles/dotlottie-react` (renders `.lottie` directly via `<DotLottieReact src=... autoplay loop={false} onComplete={...} />`; can also load `.json` as a fallback if `.lottie` fails to load).
+
+### Out of scope
+- Native iOS launch screen (the static `LaunchScreen.storyboard`/asset shown before the WebView loads) is a separate, unrelated system — not touched by this spec. This animation runs *inside* the web app once it's loaded, on both web and the Capacitor iOS build (same WebView content).
+
+---
+
 ## Detailed Flow: Notification / Reminder System — built Jun 12 2026 (commits `1299c68` → `5aa0c1e`)
 
 Two-stage daily reminder, escalating from a gentle nudge to a one-tap voice log. Configurable per-user via the "Reminders" section on the Account tab (see "Detailed Flow: Account Tab"). **Covers both iOS (Capacitor local notifications) and web/PWA (Web Push)** — both platforms behave identically from the user's perspective.
@@ -853,6 +890,9 @@ These are layout/data-model fixes to bring the existing built screen back in lin
 
 ### ~~NEXT UP — Notification / Reminder System~~ — **built Jun 12 2026** (`1299c68` → `5aa0c1e`)
 Full as-built notes in "Detailed Flow: Notification / Reminder System" above. Spec landed as designed for both platforms. Remaining follow-ups: see "Reminder system follow-ups" under "Also open" below.
+
+### ~~NEXT UP — Logo Intro Animation (Splash)~~ — **built Jun 15 2026**
+See "Detailed Flow: Logo Intro Animation (Splash)" → "As-built notes" above for what shipped. Assets in `public/animations/intro.{lottie,json}`, component at `src/components/IntroSplash.tsx`, wired in `App.tsx` via rising-edge effect over `screenIsAuth`.
 
 ### Also open (no fixed slot yet)
 - **Reminder system follow-ups:**

@@ -3298,3 +3298,78 @@ button {
    available outside installed PWA). The 430px max-width app-root
    already centers in landscape with empty space on the sides — we
    just let it. Native iOS is portrait-locked via Info.plist. */
+
+/* ════════════════════════════════════════════
+   IntroSplash — one-shot logo intro overlay
+   ════════════════════════════════════════════
+   Sits above the auth screen on every fresh logged-out mount.
+   Plays the lottie centered, then a FLIP transform on
+   .intro-splash__logo (set inline from JS) shrinks + moves it
+   onto the underlying .auth-wordmark img slot. transitionend
+   on `transform` triggers unmount via the parent. */
+.intro-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  /* Base layer behind the blobs — matches the body fallback so
+     no flash of the dark page underneath if the blobs paint late. */
+  background: #f4f2f0;
+}
+/* Static aurora — same color tokens as the home backdrop but no
+   drift keyframes. "Blank gradient," per the spec. */
+.intro-splash__blobs {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+}
+.intro-splash__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.85;
+}
+.intro-splash__blob--a {
+  width: 300px; height: 300px;
+  background: var(--blob-yellow);
+  top: -64px; left: -56px;
+}
+.intro-splash__blob--b {
+  width: 264px; height: 264px;
+  background: var(--blob-coral);
+  top: 168px; right: -48px;
+}
+.intro-splash__blob--c {
+  width: 280px; height: 280px;
+  background: var(--blob-green);
+  bottom: 188px; left: -40px;
+}
+.intro-splash__blob--d {
+  width: 248px; height: 248px;
+  background: var(--blob-blue);
+  bottom: -40px; right: -32px;
+}
+/* The lottie box. Centered via absolute positioning + 50/50 +
+   negative half-size — translate-50% would compose with the FLIP
+   transform applied from JS, so we avoid it. */
+.intro-splash__logo {
+  position: absolute;
+  width: 180px;
+  height: 180px;
+  left: 50%;
+  top: 50%;
+  margin-left: -90px;
+  margin-top: -90px;
+  z-index: 2;
+  /* transform is set inline from the FLIP code; transition / origin
+     are written there too so the rule here stays empty of
+     transition properties that could fire false transitionends. */
+  will-change: transform;
+}
+.intro-splash--done {
+  /* Once the FLIP lands, mute the splash so the unmount is
+     imperceptible — the wordmark underneath has already been
+     visible through the transparent lottie box. */
+  pointer-events: none;
+}
