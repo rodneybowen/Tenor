@@ -12,10 +12,10 @@ import { useEffect, useRef, useState } from 'react';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 /** Centralized so swapping in a different animation later is one
- *  line. JSON is the load-error fallback (same animation, larger
- *  uncompressed payload). */
-const INTRO_LOTTIE_SRC = '/animations/intro.lottie';
-const INTRO_JSON_SRC = '/animations/intro.json';
+ *  line. dotLottieReact accepts both `.lottie` and `.json`; we
+ *  ship the JSON directly since it's the wordmark source of
+ *  truth right now. */
+const INTRO_ANIMATION_SRC = `${import.meta.env.BASE_URL}animations/intro.json`;
 
 /** FLIP target: the already-rendered `.auth-wordmark img` in the
  *  DOM underneath. AuthScreen renders it always — IntroSplash just
@@ -42,9 +42,9 @@ export default function IntroSplash({ onDone }: Props) {
   // want a single transform.
   const flippedRef = useRef(false);
 
-  // .lottie → .json fallback. If the dotLottie player surfaces a
-  // load error on the binary, swap to the uncompressed JSON.
-  const [src, setSrc] = useState<string>(INTRO_LOTTIE_SRC);
+  // Single animation source (the wordmark .json). State kept so a
+  // future fallback chain can swap sources without restructuring.
+  const [src] = useState<string>(INTRO_ANIMATION_SRC);
 
   // Phase tracks visual state for CSS hooks.
   //   'playing' — lottie running, no transform applied
@@ -148,9 +148,6 @@ export default function IntroSplash({ onDone }: Props) {
           dotLottieRefCallback={(instance) => {
             if (!instance) return;
             instance.addEventListener('complete', handleComplete);
-            instance.addEventListener('loadError', () => {
-              if (src !== INTRO_JSON_SRC) setSrc(INTRO_JSON_SRC);
-            });
           }}
           style={{ width: '100%', height: '100%' }}
         />

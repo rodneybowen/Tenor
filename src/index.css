@@ -3312,6 +3312,12 @@ button {
   inset: 0;
   z-index: 1000;
   overflow: hidden;
+  /* Center the lottie via flex so the box's own size (driven by
+     `aspect-ratio` + `min(80vw, …)`) does the positioning, no
+     centering transform that would compose with the FLIP. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
   /* Base layer behind the blobs — matches the body fallback so
      no flash of the dark page underneath if the blobs paint late. */
   background: #f4f2f0;
@@ -3354,17 +3360,22 @@ button {
    negative half-size — translate-50% would compose with the FLIP
    transform applied from JS, so we avoid it. */
 .intro-splash__logo {
-  position: absolute;
-  width: 180px;
-  height: 180px;
-  left: 50%;
-  top: 50%;
-  margin-left: -90px;
-  margin-top: -90px;
+  /* Flex-centered by the parent (.intro-splash). We avoid
+     `transform: translate(-50%, -50%)` for centering because it
+     would compose with the inline FLIP transform JS writes onto
+     the same element. */
+  position: relative;
+  /* Wider + shorter than the previous 180px square — matches the
+     wordmark SVG's 86×29 viewBox so the lottie's content (which
+     ends on a frame visually identical to full-logo-dark.svg) fills
+     the box edge-to-edge. Capped at 360px for tablets, 80vw so it
+     always leaves breathing room on narrow phones. */
+  width: min(80vw, 360px);
+  aspect-ratio: 86 / 29;
   z-index: 2;
-  /* transform is set inline from the FLIP code; transition / origin
-     are written there too so the rule here stays empty of
-     transition properties that could fire false transitionends. */
+  /* `transform` is set inline from the FLIP code; transition /
+     origin are written there too so the rule here stays free of
+     transition properties that could fire stray transitionends. */
   will-change: transform;
 }
 .intro-splash--done {
