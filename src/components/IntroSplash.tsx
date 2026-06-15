@@ -25,6 +25,17 @@ const TARGET_SELECTOR = '.auth-wordmark img';
 const FLIP_DURATION_MS = 500;
 const FLIP_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
+// The lottie composition is 1200×900 but the actual wordmark only
+// occupies the central ~40% of the composition's height (the rest
+// is padding around the mark). The FLIP scale must shrink the
+// *visible wordmark* onto the target SVG, not the whole padded
+// box — so we divide out this ratio when computing scale.
+// Measured from the layer transforms in `intro.json`; if the
+// animation source changes and this ratio shifts, the splash will
+// hand off to a wordmark visibly bigger or smaller than the static
+// SVG underneath. Re-derive and update.
+const WORDMARK_H_RATIO_IN_COMP = 0.4;
+
 interface Props {
   /** Called after the FLIP transition completes — parent should
    *  setState to unmount this component. */
@@ -69,15 +80,27 @@ export default function IntroSplash({ onDone }: Props) {
 
     const from = logo.getBoundingClientRect();
     const to = target.getBoundingClientRect();
-    // Scale by height; target wordmark is 40px tall by spec, splash
-    // logo is much larger. Width follows aspect since transform
-    // scale is uniform.
-    const scale = to.height / from.height;
-    // With `transform-origin: top left`, scale shrinks from the
-    // top-left corner and translate moves that same corner. Delta
-    // is target-top-left minus splash-top-left.
-    const dx = to.left - from.left;
-    const dy = to.top - from.top;
+
+    // The visible wordmark inside the lottie occupies only the
+    // central WORDMARK_*_RATIO_IN_COMP portion of the box. To make
+    // the wordmark land at SVG height (not the padded box at SVG
+    // height), divide out the height ratio. Result: the box becomes
+    // larger than the SVG by 1 / H_RATIO, with the wordmark inside
+    // matching the SVG exactly.
+    const scale = to.height / (from.height * WORDMARK_H_RATIO_IN_COMP);
+
+    // After scale (origin: top-left), the box's NEW size is
+    // (from.width * scale, from.height * scale). We want the *box's
+    // center* to land on the SVG's center, because the wordmark is
+    // centered within the lottie composition. Solve for the translate
+    // that moves the box's top-left from `from.left` to a position
+    // where its center matches the SVG's center.
+    const scaledW = from.width * scale;
+    const scaledH = from.height * scale;
+    const finalLeft = to.left + to.width / 2 - scaledW / 2;
+    const finalTop = to.top + to.height / 2 - scaledH / 2;
+    const dx = finalLeft - from.left;
+    const dy = finalTop - from.top;
 
     logo.style.transition = `transform ${FLIP_DURATION_MS}ms ${FLIP_EASING}`;
     logo.style.transformOrigin = 'top left';

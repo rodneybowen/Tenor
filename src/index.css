@@ -2156,6 +2156,21 @@ button {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Slide-up + fade-in on splash unmount. The card mounts in
+     `--hidden` state while the IntroSplash overlays it; when the
+     splash's onDone fires, App.tsx flips `cardHidden` to false and
+     this transition runs. */
+  transition: transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1) 60ms,
+              opacity 380ms ease-out 60ms;
+  transform: translateY(0);
+  opacity: 1;
+}
+.auth-card.auth-card--hidden {
+  transform: translateY(48px);
+  opacity: 0;
+  /* Keep it click-through while hidden so the splash above (which
+     is z-indexed higher) owns all the interaction. */
+  pointer-events: none;
 }
 .auth-card__title {
   font-family: var(--font-serif);
@@ -3365,13 +3380,16 @@ button {
      would compose with the inline FLIP transform JS writes onto
      the same element. */
   position: relative;
-  /* Wider + shorter than the previous 180px square — matches the
-     wordmark SVG's 86×29 viewBox so the lottie's content (which
-     ends on a frame visually identical to full-logo-dark.svg) fills
-     the box edge-to-edge. Capped at 360px for tablets, 80vw so it
-     always leaves breathing room on narrow phones. */
-  width: min(80vw, 360px);
-  aspect-ratio: 86 / 29;
+  /* Aspect ratio matches the lottie composition (1200×900 = 4:3),
+     not the wordmark's tight 86:29 viewBox, so the lottie's
+     content fills the box edge-to-edge instead of letterboxing
+     and rendering tiny. The composition contains generous
+     padding around the wordmark; sizing the box big enough that
+     the *visible wordmark inside* reads larger than the static
+     40px-tall SVG underneath is what the FLIP scales back down
+     onto. Cap of 480px keeps it sane on tablets/desktop. */
+  width: min(90vw, 480px);
+  aspect-ratio: 4 / 3;
   z-index: 2;
   /* `transform` is set inline from the FLIP code; transition /
      origin are written there too so the rule here stays free of

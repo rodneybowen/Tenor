@@ -7,11 +7,20 @@ interface AuthScreenProps {
   /** Drops the user into the guest experience (full app, no account,
    *  logs in sessionStorage). Wired in App.tsx → useAuth.enterGuest. */
   onContinueAsGuest: () => void;
+  /** When true, hides the auth card off-screen below with `--hidden`
+   *  modifier. Flipping to false fires the slide-up + fade-in CSS
+   *  transition. Wired by App.tsx to mirror IntroSplash's lifecycle:
+   *  card stays hidden while the splash is playing, then slides in
+   *  the moment the splash unmounts. */
+  cardHidden?: boolean;
 }
 
 type Mode = 'signin' | 'signup';
 
-export default function AuthScreen({ onContinueAsGuest }: AuthScreenProps) {
+export default function AuthScreen({
+  onContinueAsGuest,
+  cardHidden = false,
+}: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -82,7 +91,7 @@ export default function AuthScreen({ onContinueAsGuest }: AuthScreenProps) {
       <div className="screen" id="auth">
         <div className="auth-shell">
           <h1 className="auth-wordmark"><img src={`${import.meta.env.BASE_URL}full-logo-dark.svg`} alt="Tenor" /></h1>
-          <div className="auth-card">
+          <div className={`auth-card${cardHidden ? ' auth-card--hidden' : ''}`}>
             <h2 className="auth-card__title">Check your email</h2>
             <p className="auth-card__sub">
               We sent a confirmation link to <strong>{email}</strong>. Click it
@@ -109,7 +118,7 @@ export default function AuthScreen({ onContinueAsGuest }: AuthScreenProps) {
       <div className="auth-shell">
         <h1 className="auth-wordmark"><img src={`${import.meta.env.BASE_URL}full-logo-dark.svg`} alt="Tenor" /></h1>
 
-        <div className="auth-card">
+        <div className={`auth-card${cardHidden ? ' auth-card--hidden' : ''}`}>
           <div className="auth-tabs" role="tablist">
             {(['signin', 'signup'] as const).map((m) => (
               <button

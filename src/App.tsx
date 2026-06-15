@@ -707,7 +707,13 @@ export default function App() {
         <BlobField />
         <GrainOverlay />
         {auth.state.status === 'unauthenticated' && (
-          <AuthScreen onContinueAsGuest={auth.enterGuest} />
+          <AuthScreen
+            onContinueAsGuest={auth.enterGuest}
+            // Card is hidden while the splash is showing; flipping
+            // to false at splash-unmount triggers the slide-up CSS
+            // transition on `.auth-card`.
+            cardHidden={showIntro}
+          />
         )}
         {auth.state.status === 'needs-profile' && (
           <ProfileSetupScreen
