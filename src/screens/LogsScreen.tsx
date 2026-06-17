@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo, useState, type CSSProperties } from 'react';
 import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 import {
   TODAY,
@@ -288,7 +288,83 @@ const BAND_Y: Record<Quadrant, number> = {
   hen: 0.88,
 };
 
+// Node granularity = unique emotion category in encounter order.
+// A single log can yield 1–4 nodes — one per distinct quadrant
+// appearing in its chips, in chip order, with duplicates dropped.
+// Same rule for every input mode (speak/type orders chips by
+// transcript position; emotion-selector orders by selection).
+// If a log has no chips with quadrant tags, fall back to the
+// precomputed `quadrants` array so the log still contributes
+// at least one node and the line doesn't gap.
+function quadrantsForLog(log: LogEntry): Quadrant[] {
+  const seen = new Set<Quadrant>();
+  const seq: Quadrant[] = [];
+  const chips = log.chips ?? [];
+  for (const c of chips) {
+    const q = c.quadrant as Quadrant | null;
+    if (!q || seen.has(q)) continue;
+    seen.add(q);
+    seq.push(q);
+  }
+  if (seq.length > 0) return seq;
+  for (const q of log.quadrants) {
+    if (seen.has(q)) continue;
+    seen.add(q);
+    seq.push(q);
+  }
+  return seq;
+}
+
+// Pick the quadrant whose band center is closest to a given y∈[0,1].
+function nearestQuadrant(y: number): Quadrant {
+  let best: Quadrant = 'hep';
+  let bestDist = Infinity;
+  for (const q of QUAD_ORDER) {
+    const d = Math.abs(BAND_Y[q] - y);
+    if (d < bestDist) { bestDist = d; best = q; }
+  }
+  return best;
+}
+
+type MoodPoint = { tx: number; ty: number; quadrant: Quadrant };
+
 export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
+  // Flatten across logs in chronological order: log 1's nodes, then
+  // log 2's nodes, etc. X spaces uniformly across the total count.
+  const flat: Quadrant[] = [];
+  for (const l of logs) {
+    for (const q of quadrantsForLog(l)) flat.push(q);
+  }
+  const pts: MoodPoint[] = flat.map((q, i) => ({
+    tx: flat.length === 1 ? 0.5 : i / (flat.length - 1),
+    ty: BAND_Y[q],
+    quadrant: q,
+  }));
+  return <MoodLine pts={pts} ariaLabel="Mood across the day" />;
+}
+
+function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
+  const keys = periodDayKeys('W', anchor);
+  // One point per day with logs. Y = average of every chip's band-Y
+  // that day; color = quadrant band nearest that average. Days without
+  // logs are skipped — the spline glides over them.
+  const pts: MoodPoint[] = [];
+  keys.forEach((key, i) => {
+    const dayLogs = logsForDay(key, logs);
+    if (dayLogs.length === 0) return;
+    const ys: number[] = [];
+    for (const l of dayLogs) {
+      for (const q of quadrantsForLog(l)) ys.push(BAND_Y[q]);
+    }
+    if (ys.length === 0) return;
+    const avgY = ys.reduce((s, y) => s + y, 0) / ys.length;
+    pts.push({ tx: i / 6, ty: avgY, quadrant: nearestQuadrant(avgY) });
+  });
+  if (pts.length === 0) return null;
+  return <MoodLine pts={pts} ariaLabel="Mood across the week" />;
+}
+
+function MoodLine({ pts, ariaLabel }: { pts: MoodPoint[]; ariaLabel: string }) {
   const W = 320;
   const H = 200;
   const padX = 12;
@@ -296,48 +372,11 @@ export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
   const innerW = W - padX * 2;
   const innerH = H - padY * 2;
 
-  // Node granularity = unique emotion category in encounter order.
-  // A single log can yield 1–4 nodes — one per distinct quadrant
-  // appearing in its chips, in chip order, with duplicates dropped.
-  // Same rule for every input mode (speak/type orders chips by
-  // transcript position; emotion-selector orders by selection).
-  // If a log has no chips with quadrant tags, fall back to the
-  // precomputed `quadrants` array so the log still contributes
-  // at least one node and the line doesn't gap.
-  function quadrantsFor(log: LogEntry): Quadrant[] {
-    const seen = new Set<Quadrant>();
-    const seq: Quadrant[] = [];
-    const chips = log.chips ?? [];
-    for (const c of chips) {
-      const q = c.quadrant as Quadrant | null;
-      if (!q || seen.has(q)) continue;
-      seen.add(q);
-      seq.push(q);
-    }
-    if (seq.length > 0) return seq;
-    // Fallback for legacy / unchipped logs.
-    for (const q of log.quadrants) {
-      if (seen.has(q)) continue;
-      seen.add(q);
-      seq.push(q);
-    }
-    return seq;
-  }
-
-  // Flatten across logs in chronological order: log 1's nodes, then
-  // log 2's nodes, etc. X spaces uniformly across the total count.
-  const flat: Quadrant[] = [];
-  for (const l of logs) {
-    for (const q of quadrantsFor(l)) flat.push(q);
-  }
-  const points = flat.map((q, i) => {
-    const t = flat.length === 1 ? 0.5 : i / (flat.length - 1);
-    return {
-      x: padX + t * innerW,
-      y: padY + BAND_Y[q] * innerH,
-      quadrant: q,
-    };
-  });
+  const points = pts.map((p) => ({
+    x: padX + p.tx * innerW,
+    y: padY + p.ty * innerH,
+    quadrant: p.quadrant,
+  }));
 
   // Two-point days get a single quadratic Bézier whose control point
   // sits on the chord-perpendicular such that:
@@ -421,7 +460,7 @@ export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
       className="day-mood"
       viewBox={`0 0 ${W} ${H}`}
       role="img"
-      aria-label="Mood across the day"
+      aria-label={ariaLabel}
     >
       {/* Four colored bands: HEP yellow → LEP green → (baseline) → LEN blue → HEN coral. */}
       {(['hep', 'lep', 'len', 'hen'] as Quadrant[]).map((q, i) => (
@@ -503,62 +542,56 @@ function WeekBody({
   onDrillToDay: (d: Date) => void;
 }) {
   const keys = periodDayKeys('W', anchor);
+  const hasAnyLogs = keys.some((k) => logsForDay(k, logs).length > 0);
   return (
-    <div className="week-bars">
-      {keys.map((key, i) => {
-        const date = dateFromKey(key);
-        const isFuture = date.getTime() > TODAY.getTime() && key !== TODAY_KEY;
-        const quads = quadrantsForDay(key, logs);
-        const hasLogs = quads.length > 0;
-        const isToday = key === TODAY_KEY;
+    <>
+      {hasAnyLogs && (
+        <section className="logs-section">
+          <h3 className="logs-section__title">Your week&apos;s mood</h3>
+          <WeekMoodLine anchor={anchor} logs={logs} />
+        </section>
+      )}
+      <div className="day-row" role="tablist" aria-label="Days this week">
+        {keys.map((key, i) => {
+          const date = dateFromKey(key);
+          const isFuture = date.getTime() > TODAY.getTime() && key !== TODAY_KEY;
+          const quads = quadrantsForDay(key, logs);
+          const hasLogs = quads.length > 0;
+          const isToday = key === TODAY_KEY;
 
-        // Per-quadrant counts inside this day for the stacked segments.
-        const counts: Record<Quadrant, number> = { hep: 0, lep: 0, hen: 0, len: 0 };
-        for (const q of quads) counts[q] += 1;
-        const total = quads.length || 1;
+          let dotClass = 'day__dot ';
+          let dotStyle: CSSProperties = {};
+          if (isFuture) {
+            dotClass += 'day__dot--future';
+          } else if (hasLogs) {
+            dotClass += 'day__dot--logged';
+            dotStyle = { background: dotBackground(quads) };
+          } else {
+            dotClass += 'day__dot--empty';
+          }
 
-        return (
-          <button
-            key={key}
-            type="button"
-            className={
-              'week-bars__col' +
-              (isFuture ? ' week-bars__col--future' : '') +
-              (isToday ? ' week-bars__col--today' : '')
-            }
-            aria-label={
-              hasLogs
-                ? `${WEEK_LETTERS[i]}, ${quads.length} log${quads.length === 1 ? '' : 's'}`
-                : `${WEEK_LETTERS[i]}, no logs`
-            }
-            disabled={isFuture}
-            onClick={() => !isFuture && onDrillToDay(date)}
-          >
-            <span className="week-bars__letter">{WEEK_LETTERS[i]}</span>
-            <div
-              className={
-                'week-bars__bar' +
-                (!hasLogs ? ' week-bars__bar--empty' : '')
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={false}
+              aria-label={
+                hasLogs
+                  ? `${WEEK_LETTERS[i]}, ${quads.length} log${quads.length === 1 ? '' : 's'}`
+                  : `${WEEK_LETTERS[i]}, no logs`
               }
+              disabled={isFuture}
+              className={'day' + (isToday ? ' day--today' : '')}
+              onClick={() => !isFuture && onDrillToDay(date)}
             >
-              {hasLogs &&
-                QUAD_ORDER.map((q) =>
-                  counts[q] > 0 ? (
-                    <span
-                      key={q}
-                      className="week-bars__seg"
-                      style={{
-                        height: `${(counts[q] / total) * 100}%`,
-                        background: quadrantColor(q, 0.75),
-                      }}
-                    />
-                  ) : null,
-                )}
-            </div>
-          </button>
-        );
-      })}
-    </div>
+              <span className="day__letter">{WEEK_LETTERS[i]}</span>
+              <span className={dotClass} style={dotStyle} />
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 

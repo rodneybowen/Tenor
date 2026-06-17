@@ -630,6 +630,69 @@ Sourced from the user's published Google Sheet (CSV-pulled). If vocabulary list 
 
 ---
 
+## Detailed Flow: Emotion Selector v2 — Starburst + A/B Variant System (speced Jun 15 2026, not yet built)
+
+Two parallel variants of the emotion selector, user-chosen on first encounter and switchable any time in Account settings. Downstream output (chips, review screen, log format, quadrant colors) is **identical** between variants — no data model changes beyond the variant preference itself.
+
+### Variant definitions
+- **`'classic'`** — existing 4-quadrant flat grid (HEP/LEP/LEN/HEN picker → fisheye chip plane). Default until the user makes a choice.
+- **`'starburst'`** — 8 named base emotions arranged radially on the same 2D pannable fisheye plane. Centering on a base emotion offers "select this" or "go deeper" into ~6-8 sub-emotions (also radial). Breadcrumb at top tracks depth: `[Base] →` while panning sub-layer, `[Base] → [Specific]` when centered on a sub-emotion.
+
+### Profiles columns (migration `0010_emotion_ui_ab.sql`)
+- `emotion_ui TEXT NOT NULL DEFAULT 'classic'` — current active variant
+- `emotion_ui_initial TEXT` — first choice made on the prompt (never changes after set; NULL = hasn't seen the prompt yet)
+- `emotion_ui_prompt_shown BOOLEAN NOT NULL DEFAULT false` — whether the one-time prompt has been shown
+
+No usage counters — deliberate decision to avoid behavioral telemetry in a mental health context.
+
+### One-time variant prompt
+- **Trigger:** `IntersectionObserver` on the `lm-section--quads` element in `LogMethodScreen`. Fires once when that section enters the viewport. Only shows if `profiles.emotion_ui_prompt_shown === false` (or user is a guest → skip prompt, use classic silently).
+- **Copy:** "Quick question — how do you prefer to find your feelings?" with two buttons:
+  - **"How intense"** → sets `emotion_ui = 'classic'`, `emotion_ui_initial = 'classic'`, `emotion_ui_prompt_shown = true`
+  - **"What kind"** → sets `emotion_ui = 'starburst'`, `emotion_ui_initial = 'starburst'`, `emotion_ui_prompt_shown = true`
+  - Helper text below: *"You can change this any time in settings."*
+- **Presentation:** modal/sheet style, same bubble aesthetic as the current definition card. Appears below the quadrant section, does not block navigation. User can also dismiss it without choosing (tap outside) — in that case prompt remains shown=false and will appear again next visit.
+- **Saves** to `profiles` via Supabase update immediately on button tap. For guests, choice is session-only (no Supabase write).
+
+### Starburst layout
+- Same 2D pannable plane and fisheye as classic. Same pan gestures (touch, trackpad, mouse drag), same haptics, same selection cap (5 emotions), same chip aesthetics (gradient lit-sphere, quadrant color).
+- **Layer 1 — base emotions:** 8 chips arranged radially at 45° increments around a center point (radius ≈ 200px from center). Chips colored by their quadrant. Larger than classic chips (~130px) since there are fewer per view.
+  - HEP (yellow): **Joyful** (0°), **Surprised** (45°)
+  - LEP (green): **Loving** (90°), **Peaceful** (135°)
+  - LEN (blue): **Sad** (180°), **Afraid** (225°)
+  - HEN (red): **Disgusted** (270°), **Angry** (315°)
+- **Definition card:** same card component as classic but copy reads: *"[Emotion] — select this, or explore more specific feelings below."* Two actions: **"Select [emotion]"** (proceeds to review) and **"Go deeper →"** (drills into layer 2).
+- **Layer 2 — sub-emotions:** on "Go deeper", the plane transitions to show sub-emotions of the selected base (also radially arranged, same 45° spacing, up to 8 items — fewer items → wider angular spacing). Breadcrumb appears at top: `Joyful →`. Definition card shows the sub-emotion name + definition; only one action: **"Select [sub-emotion]"**. Back gesture or back button returns to layer 1.
+- **Breadcrumb:** top of screen, Montserrat Label, neutral-400. Updates live as user pans: `Joyful →` while on layer 2 undecided, `Joyful → Elated` when centered on a specific sub-emotion.
+
+### Starburst emotion hierarchy (adapted from circumplex model — NOT copied verbatim from any third-party wheel)
+```
+HEP:
+  joyful     → cheerful, playful, enthusiastic, elated, hopeful, proud, amused, optimistic
+  surprised  → amazed, astonished, awe-struck, speechless, stunned, overwhelmed
+
+LEP:
+  peaceful   → serene, content, tranquil, satisfied, calm, touched, grounded
+  loving     → affectionate, compassionate, romantic, tender, nostalgic, sentimental, moved
+
+LEN:
+  sad        → lonely, unhappy, disappointed, gloomy, hopeless, disheartened, shameful, empty
+  afraid     → anxious, nervous, terrified, insecure, worried, dreadful, panicked
+
+HEN:
+  angry      → enraged, frustrated, irritable, resentful, aggravated, annoyed, hostile
+  disgusted  → contemptuous, revolted, repelled, appalled, scornful
+```
+Each sub-emotion inherits its parent's quadrant for coloring. Definitions for sub-emotions reuse the existing `EMOTION_DEFINITIONS` map where the word exists; new words need brief definitions added to `theme/emotions.ts`.
+
+### AccountScreen toggle
+New `acct-section` between "Reminders" and "Sign out" labeled **"Emotion categories"**. Two-option inline selector (pill toggle, same styling as a segmented control):
+- **"By intensity"** (← maps to `'classic'`)
+- **"By type"** (← maps to `'starburst'`)
+Saves immediately to `profiles.emotion_ui` on change. Only shown for authenticated users; hidden in guest mode.
+
+---
+
 ## Design Principles
 
 - **Web/mobile parity is mandatory.** Any feature, fix, or visual change that *can* apply to both the web (GitHub Pages PWA) and iOS (Capacitor) builds MUST be implemented for both — never ship something as iOS-only (or web-only) by default. The only acceptable exceptions are things gated by `Capacitor.isNativePlatform()` because the underlying capability genuinely doesn't exist on the other platform (e.g. native notifications, Control Center widgets, Taptic haptics). When a feature has a native-only piece (like push notifications), still build the best available equivalent for web (e.g. browser Notification API) rather than skipping it — and document the platform split explicitly in this file so it's never assumed to be "done everywhere" when it isn't.
@@ -893,6 +956,9 @@ Full as-built notes in "Detailed Flow: Notification / Reminder System" above. Sp
 
 ### ~~NEXT UP — Logo Intro Animation (Splash)~~ — **built Jun 15 2026**
 See "Detailed Flow: Logo Intro Animation (Splash)" → "As-built notes" above for what shipped. Assets in `public/animations/intro.{lottie,json}`, component at `src/components/IntroSplash.tsx`, wired in `App.tsx` via rising-edge effect over `screenIsAuth`.
+
+### NEXT UP (added Jun 15 2026) — Emotion Selector v2: starburst UI + A/B variant system
+Full spec in "Detailed Flow: Emotion Selector v2 — Starburst + A/B" below (to be added). Classic (HEP/LEP/LEN/HEN quadrant grid) vs Starburst (8 named base emotions radial fisheye → drill to sub-emotions). First-time variant prompt on `LogMethodScreen` when quadrant section scrolls into view: "How intense your feeling is" vs "What kind of feeling it is." Both initial pick and per-open usage tracked per user on `profiles` (migration `0010_emotion_ui_ab.sql`). AccountScreen toggle. Data model: hierarchical vocab alongside existing flat `VocabByCategory`; downstream (chips, review screen) unchanged.
 
 ### Also open (no fixed slot yet)
 - **Reminder system follow-ups:**
