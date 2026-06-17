@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type CSSProperties } from 'react';
+import { useId, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { CaretLeft, CaretRight } from '@phosphor-icons/react';
 import {
   TODAY,
@@ -100,6 +100,7 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
     [view, anchor],
   );
   const forwardDisabled = isFuturePeriod(view, shiftPeriod(view, anchor, 1));
+  const swipeStart = useRef<{ x: number; y: number } | null>(null);
 
   return (
     <div className="screen" id="logs">
@@ -113,7 +114,30 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
           forwardDisabled={forwardDisabled}
         />
 
-        <div className="logs-body">
+        <div
+          className="logs-body"
+          onPointerDown={(e) => {
+            if (view !== 'D' && view !== 'W') return;
+            // Ignore non-primary pointers (e.g. multi-touch zoom).
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            swipeStart.current = { x: e.clientX, y: e.clientY };
+          }}
+          onPointerUp={(e) => {
+            const start = swipeStart.current;
+            swipeStart.current = null;
+            if (!start) return;
+            const dx = e.clientX - start.x;
+            const dy = e.clientY - start.y;
+            // Threshold: 50px horizontal AND mostly horizontal (vs vertical
+            // scroll). Left swipe → next period, right swipe → previous,
+            // matching the natural "drag the next page in" mental model.
+            if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+            go(dx > 0 ? -1 : 1);
+          }}
+          onPointerCancel={() => {
+            swipeStart.current = null;
+          }}
+        >
           {/* Keyed wrapper → React unmounts/remounts on view change, so the
               fade-up entry animation re-fires per switch. The visualization
               for D/W/M/Y is structurally too different to tween element-by-
@@ -256,13 +280,27 @@ function DayBody({
 }) {
   const key = periodDayKeys('D', anchor)[0];
   const dayLogs = logsForDay(key, logs);
+  // Carry-over from immediately adjacent days — last node of yesterday
+  // and first node of tomorrow, so the spline visibly extends past the
+  // chart edges when the user swipes between days.
+  const prevDate = new Date(anchor);
+  prevDate.setDate(prevDate.getDate() - 1);
+  const nextDate = new Date(anchor);
+  nextDate.setDate(nextDate.getDate() + 1);
+  const leadingQ = lastQuadrantOfDay(prevDate, logs);
+  const trailingQ = firstQuadrantOfDay(nextDate, logs);
 
   return (
     <>
       {dayLogs.length > 0 && (
         <section className="logs-section">
           <h3 className="logs-section__title">Your day&apos;s mood</h3>
-          <DayMoodLine logs={dayLogs} />
+          <DayMoodLine
+            logs={dayLogs}
+            leadingQ={leadingQ}
+            trailingQ={trailingQ}
+            edge
+          />
         </section>
       )}
 
@@ -315,32 +353,39 @@ function quadrantsForLog(log: LogEntry): Quadrant[] {
   return seq;
 }
 
-// Pick the quadrant whose band center is closest to a given y∈[0,1].
-function nearestQuadrant(y: number): Quadrant {
-  let best: Quadrant = 'hep';
-  let bestDist = Infinity;
-  for (const q of QUAD_ORDER) {
-    const d = Math.abs(BAND_Y[q] - y);
-    if (d < bestDist) { bestDist = d; best = q; }
-  }
-  return best;
-}
-
 type MoodPoint = { tx: number; ty: number; quadrant: Quadrant };
 
-export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
+export function DayMoodLine({
+  logs,
+  leadingQ,
+  trailingQ,
+  edge = false,
+}: {
+  logs: LogEntry[];
+  leadingQ?: Quadrant;
+  trailingQ?: Quadrant;
+  edge?: boolean;
+}) {
   // Flatten across logs in chronological order: log 1's nodes, then
   // log 2's nodes, etc. X spaces uniformly across the total count.
   const flat: Quadrant[] = [];
   for (const l of logs) {
     for (const q of quadrantsForLog(l)) flat.push(q);
   }
-  const pts: MoodPoint[] = flat.map((q, i) => ({
-    tx: flat.length === 1 ? 0.5 : i / (flat.length - 1),
-    ty: BAND_Y[q],
-    quadrant: q,
-  }));
-  return <MoodLine pts={pts} ariaLabel="Mood across the day" />;
+  const pts: MoodPoint[] = [];
+  // Carry-over from previous day — invisible anchor that lets the spline
+  // enter from off-screen left so the chart visibly continues across
+  // period boundaries when the user swipes between days.
+  if (edge && leadingQ) pts.push({ tx: -0.12, ty: BAND_Y[leadingQ], quadrant: leadingQ });
+  flat.forEach((q, i) => {
+    pts.push({
+      tx: flat.length === 1 ? 0.5 : i / (flat.length - 1),
+      ty: BAND_Y[q],
+      quadrant: q,
+    });
+  });
+  if (edge && trailingQ) pts.push({ tx: 1.12, ty: BAND_Y[trailingQ], quadrant: trailingQ });
+  return <MoodLine pts={pts} ariaLabel="Mood across the day" edge={edge} />;
 }
 
 function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
@@ -368,13 +413,81 @@ function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
     });
   });
   if (pts.length === 0) return null;
-  return <MoodLine pts={pts} ariaLabel="Mood across the week" />;
+  // Carry-over from the previous week's last logged day, and into the
+  // next week's first logged day — same continuity story as the daily
+  // chart, just bookended by whole weeks.
+  const prevWeekAnchor = shiftPeriod('W', anchor, -1);
+  const nextWeekAnchor = shiftPeriod('W', anchor, 1);
+  const leadingQ = lastQuadrantOfWeek(prevWeekAnchor, logs);
+  const trailingQ = firstQuadrantOfWeek(nextWeekAnchor, logs);
+  const withCarry: MoodPoint[] = [];
+  if (leadingQ) withCarry.push({ tx: -0.12, ty: BAND_Y[leadingQ], quadrant: leadingQ });
+  withCarry.push(...pts);
+  if (trailingQ) withCarry.push({ tx: 1.12, ty: BAND_Y[trailingQ], quadrant: trailingQ });
+  return <MoodLine pts={withCarry} ariaLabel="Mood across the week" edge />;
 }
 
-function MoodLine({ pts, ariaLabel }: { pts: MoodPoint[]; ariaLabel: string }) {
+function dayKeyOf(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function lastQuadrantOfDay(date: Date, logs: LogEntry[]): Quadrant | undefined {
+  const dayLogs = logsForDay(dayKeyOf(date), logs);
+  for (let i = dayLogs.length - 1; i >= 0; i--) {
+    const qs = quadrantsForLog(dayLogs[i]);
+    if (qs.length) return qs[qs.length - 1];
+  }
+  return undefined;
+}
+
+function firstQuadrantOfDay(date: Date, logs: LogEntry[]): Quadrant | undefined {
+  const dayLogs = logsForDay(dayKeyOf(date), logs);
+  for (const l of dayLogs) {
+    const qs = quadrantsForLog(l);
+    if (qs.length) return qs[0];
+  }
+  return undefined;
+}
+
+function lastQuadrantOfWeek(anchor: Date, logs: LogEntry[]): Quadrant | undefined {
+  const keys = periodDayKeys('W', anchor);
+  for (let i = keys.length - 1; i >= 0; i--) {
+    const dayLogs = logsForDay(keys[i], logs);
+    for (let j = dayLogs.length - 1; j >= 0; j--) {
+      const qs = quadrantsForLog(dayLogs[j]);
+      if (qs.length) return qs[qs.length - 1];
+    }
+  }
+  return undefined;
+}
+
+function firstQuadrantOfWeek(anchor: Date, logs: LogEntry[]): Quadrant | undefined {
+  const keys = periodDayKeys('W', anchor);
+  for (const k of keys) {
+    const dayLogs = logsForDay(k, logs);
+    for (const l of dayLogs) {
+      const qs = quadrantsForLog(l);
+      if (qs.length) return qs[0];
+    }
+  }
+  return undefined;
+}
+
+function MoodLine({
+  pts,
+  ariaLabel,
+  edge = false,
+}: {
+  pts: MoodPoint[];
+  ariaLabel: string;
+  edge?: boolean;
+}) {
   const W = 320;
-  const H = 200;
-  const padX = 12;
+  // Edge mode is 3/4 as tall and runs flush to the SVG's horizontal
+  // edges — points with tx<0 or tx>1 (carry-over from prev/next period)
+  // land off-screen and only contribute their connecting segment.
+  const H = edge ? 150 : 200;
+  const padX = edge ? 0 : 12;
   const padY = 12;
   const innerW = W - padX * 2;
   const innerH = H - padY * 2;
@@ -382,6 +495,7 @@ function MoodLine({ pts, ariaLabel }: { pts: MoodPoint[]; ariaLabel: string }) {
   const points = pts.map((p) => ({
     x: padX + p.tx * innerW,
     y: padY + p.ty * innerH,
+    tx: p.tx,
     quadrant: p.quadrant,
   }));
 
@@ -464,7 +578,7 @@ function MoodLine({ pts, ariaLabel }: { pts: MoodPoint[]; ariaLabel: string }) {
 
   return (
     <svg
-      className="day-mood"
+      className={'day-mood' + (edge ? ' day-mood--edge' : '')}
       viewBox={`0 0 ${W} ${H}`}
       role="img"
       aria-label={ariaLabel}
@@ -519,18 +633,22 @@ function MoodLine({ pts, ariaLabel }: { pts: MoodPoint[]; ariaLabel: string }) {
           strokeLinejoin="round"
         />
       ))}
-      {/* Points on each log so a single-log day still has something to render. */}
-      {points.map((p, i) => (
-        <circle
-          key={i}
-          cx={p.x}
-          cy={p.y}
-          r={4.5}
-          fill={quadrantColor(p.quadrant, 1)}
-          stroke="#ffffff"
-          strokeWidth={1.5}
-        />
-      ))}
+      {/* Points on each log so a single-log day still has something to
+          render. Carry-over anchors at tx<0 or tx>1 are skipped here —
+          they only exist to extend the spline off-screen. */}
+      {points.map((p, i) =>
+        p.tx < 0 || p.tx > 1 ? null : (
+          <circle
+            key={i}
+            cx={p.x}
+            cy={p.y}
+            r={4.5}
+            fill={quadrantColor(p.quadrant, 1)}
+            stroke="#ffffff"
+            strokeWidth={1.5}
+          />
+        ),
+      )}
     </svg>
   );
 }
