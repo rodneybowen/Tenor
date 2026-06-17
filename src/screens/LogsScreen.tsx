@@ -100,7 +100,114 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
     [view, anchor],
   );
   const forwardDisabled = isFuturePeriod(view, shiftPeriod(view, anchor, 1));
-  const swipeStart = useRef<{ x: number; y: number } | null>(null);
+
+  // Swipe state. The chart strip translates with the finger; on
+  // release we either snap to an adjacent period (commit + reset) or
+  // bounce back to centre. Only D and W get this — M / Y stick to the
+  // chevrons because their visualisations aren't a continuous strip.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const swipe = useRef<{ x: number; y: number; locked: boolean } | null>(null);
+  const [dragX, setDragX] = useState(0);
+  const [snapping, setSnapping] = useState(false);
+
+  const isStripView = view === 'D' || view === 'W';
+
+  function commit(dir: -1 | 1) {
+    // Animate the strip the rest of the way to the snap position, then
+    // update the anchor and reset transform without a transition. The
+    // 220ms matches the .mood-strip--snap CSS transition.
+    const width = stripRef.current?.offsetWidth ?? window.innerWidth;
+    setSnapping(true);
+    setDragX(dir === 1 ? -width : width);
+    window.setTimeout(() => {
+      setSnapping(false);
+      go(dir);
+      setDragX(0);
+    }, 220);
+  }
+
+  function onSwipePointerDown(e: React.PointerEvent) {
+    if (!isStripView) return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    swipe.current = { x: e.clientX, y: e.clientY, locked: false };
+    setSnapping(false);
+  }
+  function onSwipePointerMove(e: React.PointerEvent) {
+    const s = swipe.current;
+    if (!s) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (!s.locked) {
+      // Wait until the gesture is clearly horizontal before locking —
+      // otherwise vertical scrolls would tug the chart sideways.
+      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+      if (Math.abs(dx) <= Math.abs(dy)) {
+        swipe.current = null;
+        return;
+      }
+      s.locked = true;
+    }
+    // Future periods are off-limits — give a small rubber-band tug
+    // forward so the gesture still feels alive but caps quickly.
+    const futureBlocked = isFuturePeriod(view, shiftPeriod(view, anchor, 1));
+    let clamped = dx;
+    if (futureBlocked && clamped < 0) clamped = Math.max(clamped * 0.3, -window.innerWidth * 0.12);
+    setDragX(clamped);
+  }
+  function onSwipePointerUp() {
+    const s = swipe.current;
+    swipe.current = null;
+    if (!s || !s.locked) return;
+    const width = stripRef.current?.offsetWidth ?? window.innerWidth;
+    const threshold = width * 0.4;
+    if (Math.abs(dragX) >= threshold) {
+      const dir: -1 | 1 = dragX > 0 ? -1 : 1;
+      // Forward into the future was already clamped at rubber-band
+      // range, so this can only trigger for the allowed direction.
+      const futureBlocked = isFuturePeriod(view, shiftPeriod(view, anchor, 1));
+      if (dir === 1 && futureBlocked) {
+        setSnapping(true);
+        setDragX(0);
+        window.setTimeout(() => setSnapping(false), 220);
+        return;
+      }
+      commit(dir);
+    } else {
+      setSnapping(true);
+      setDragX(0);
+      window.setTimeout(() => setSnapping(false), 220);
+    }
+  }
+
+  // Title + 3-panel strip, rendered OUTSIDE the keyed view-anim wrapper
+  // so it doesn't unmount on anchor change. The middle panel is always
+  // the current period; prev / next are pre-rendered so the swipe
+  // reveals the new chart smoothly. After commit() updates anchor, the
+  // strip recomputes its 3 panels — what was "next" becomes the new
+  // centre — and dragX resets to 0 with no transition, masking the swap.
+  const chartStrip = isStripView && (
+    <>
+      <h3 className="logs-section__title">
+        {view === 'D' ? "Your day's mood" : "Your week's mood"}
+      </h3>
+      <div className="mood-strip-wrap" ref={stripRef}>
+        <div
+          className={'mood-strip' + (snapping ? ' mood-strip--snap' : '')}
+          style={{ transform: `translateX(calc(-33.3333% + ${dragX}px))` }}
+        >
+          <div className="mood-strip__panel">
+            <ChartPanel view={view} anchor={shiftPeriod(view, anchor, -1)} logs={logs} />
+          </div>
+          <div className="mood-strip__panel">
+            <ChartPanel view={view} anchor={anchor} logs={logs} />
+          </div>
+          <div className="mood-strip__panel">
+            <ChartPanel view={view} anchor={shiftPeriod(view, anchor, 1)} logs={logs} />
+          </div>
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="screen" id="logs">
@@ -116,28 +223,17 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
 
         <div
           className="logs-body"
-          onPointerDown={(e) => {
-            if (view !== 'D' && view !== 'W') return;
-            // Ignore non-primary pointers (e.g. multi-touch zoom).
-            if (e.pointerType === 'mouse' && e.button !== 0) return;
-            swipeStart.current = { x: e.clientX, y: e.clientY };
-          }}
-          onPointerUp={(e) => {
-            const start = swipeStart.current;
-            swipeStart.current = null;
-            if (!start) return;
-            const dx = e.clientX - start.x;
-            const dy = e.clientY - start.y;
-            // Threshold: 50px horizontal AND mostly horizontal (vs vertical
-            // scroll). Left swipe → next period, right swipe → previous,
-            // matching the natural "drag the next page in" mental model.
-            if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
-            go(dx > 0 ? -1 : 1);
-          }}
+          onPointerDown={onSwipePointerDown}
+          onPointerMove={onSwipePointerMove}
+          onPointerUp={onSwipePointerUp}
           onPointerCancel={() => {
-            swipeStart.current = null;
+            swipe.current = null;
+            setSnapping(true);
+            setDragX(0);
+            window.setTimeout(() => setSnapping(false), 220);
           }}
         >
+          {chartStrip}
           {/* Keyed wrapper → React unmounts/remounts on view change, so the
               fade-up entry animation re-fires per switch. The visualization
               for D/W/M/Y is structurally too different to tween element-by-
@@ -280,41 +376,46 @@ function DayBody({
 }) {
   const key = periodDayKeys('D', anchor)[0];
   const dayLogs = logsForDay(key, logs);
-  // Carry-over from immediately adjacent days — last node of yesterday
-  // and first node of tomorrow, so the spline visibly extends past the
-  // chart edges when the user swipes between days.
-  const prevDate = new Date(anchor);
-  prevDate.setDate(prevDate.getDate() - 1);
-  const nextDate = new Date(anchor);
-  nextDate.setDate(nextDate.getDate() + 1);
-  const leadingQ = lastQuadrantOfDay(prevDate, logs);
-  const trailingQ = firstQuadrantOfDay(nextDate, logs);
 
-  return (
-    <>
-      {dayLogs.length > 0 && (
-        <section className="logs-section">
-          <h3 className="logs-section__title">Your day&apos;s mood</h3>
-          <DayMoodLine
-            logs={dayLogs}
-            leadingQ={leadingQ}
-            trailingQ={trailingQ}
-            edge
-          />
-        </section>
-      )}
-
-      {dayLogs.length === 0 ? (
-        <p className="logs-empty">no logs on this day</p>
-      ) : (
-        <DayLogList
-          dayLogs={dayLogs}
-          allLogs={logs}
-          onOpen={onOpenLog}
-        />
-      )}
-    </>
+  return dayLogs.length === 0 ? (
+    <p className="logs-empty">no logs on this day</p>
+  ) : (
+    <DayLogList dayLogs={dayLogs} allLogs={logs} onOpen={onOpenLog} />
   );
+}
+
+// Single chart panel inside the swipeable strip. Looks up its own
+// adjacent-period carry-over so each panel is self-contained.
+function ChartPanel({
+  view,
+  anchor,
+  logs,
+}: {
+  view: LogView;
+  anchor: Date;
+  logs: LogEntry[];
+}) {
+  if (view === 'D') {
+    const key = periodDayKeys('D', anchor)[0];
+    const dayLogs = logsForDay(key, logs);
+    const prevDate = new Date(anchor);
+    prevDate.setDate(prevDate.getDate() - 1);
+    const nextDate = new Date(anchor);
+    nextDate.setDate(nextDate.getDate() + 1);
+    const leadingQ = lastQuadrantOfDay(prevDate, logs);
+    const trailingQ = firstQuadrantOfDay(nextDate, logs);
+    // Empty day still renders the bands so the swipe strip stays the
+    // same height across periods — only the spline + dots are absent.
+    return (
+      <DayMoodLine
+        logs={dayLogs}
+        leadingQ={leadingQ}
+        trailingQ={trailingQ}
+        edge
+      />
+    );
+  }
+  return <WeekMoodLine anchor={anchor} logs={logs} />;
 }
 
 // Vertical band order (top → bottom): HEP, LEP, baseline, LEN, HEN.
@@ -412,7 +513,6 @@ function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
       });
     });
   });
-  if (pts.length === 0) return null;
   // Carry-over from the previous week's last logged day, and into the
   // next week's first logged day — same continuity story as the daily
   // chart, just bookended by whole weeks.
@@ -424,6 +524,8 @@ function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
   if (leadingQ) withCarry.push({ tx: -0.12, ty: BAND_Y[leadingQ], quadrant: leadingQ });
   withCarry.push(...pts);
   if (trailingQ) withCarry.push({ tx: 1.12, ty: BAND_Y[trailingQ], quadrant: trailingQ });
+  // Always render the chart shell (bands) so empty weeks inside the
+  // swipe strip keep the same height as logged weeks.
   return <MoodLine pts={withCarry} ariaLabel="Mood across the week" edge />;
 }
 
@@ -667,15 +769,8 @@ function WeekBody({
   onDrillToDay: (d: Date) => void;
 }) {
   const keys = periodDayKeys('W', anchor);
-  const hasAnyLogs = keys.some((k) => logsForDay(k, logs).length > 0);
   return (
     <>
-      {hasAnyLogs && (
-        <section className="logs-section">
-          <h3 className="logs-section__title">Your week&apos;s mood</h3>
-          <WeekMoodLine anchor={anchor} logs={logs} />
-        </section>
-      )}
       <div className="day-row" role="tablist" aria-label="Days this week">
         {keys.map((key, i) => {
           const date = dateFromKey(key);
