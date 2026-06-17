@@ -344,21 +344,28 @@ export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
 }
 
 function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
+  // Each weekday owns a 1/7 horizontal slot. Within a day, its nodes
+  // (one per unique quadrant per log, same rule as DayMoodLine) are
+  // distributed evenly inside that slot. Empty days contribute nothing
+  // — the spline connects the last node of the previous logged day
+  // directly to the first node of the next logged day, jumping the
+  // empty slot. Leading / trailing empty days simply trim the line.
   const keys = periodDayKeys('W', anchor);
-  // One point per day with logs. Y = average of every chip's band-Y
-  // that day; color = quadrant band nearest that average. Days without
-  // logs are skipped — the spline glides over them.
   const pts: MoodPoint[] = [];
-  keys.forEach((key, i) => {
-    const dayLogs = logsForDay(key, logs);
-    if (dayLogs.length === 0) return;
-    const ys: number[] = [];
-    for (const l of dayLogs) {
-      for (const q of quadrantsForLog(l)) ys.push(BAND_Y[q]);
+  keys.forEach((k, dayIdx) => {
+    const dayNodes: Quadrant[] = [];
+    for (const l of logsForDay(k, logs)) {
+      for (const q of quadrantsForLog(l)) dayNodes.push(q);
     }
-    if (ys.length === 0) return;
-    const avgY = ys.reduce((s, y) => s + y, 0) / ys.length;
-    pts.push({ tx: i / 6, ty: avgY, quadrant: nearestQuadrant(avgY) });
+    const n = dayNodes.length;
+    if (n === 0) return;
+    dayNodes.forEach((q, j) => {
+      pts.push({
+        tx: (dayIdx + (j + 0.5) / n) / 7,
+        ty: BAND_Y[q],
+        quadrant: q,
+      });
+    });
   });
   if (pts.length === 0) return null;
   return <MoodLine pts={pts} ariaLabel="Mood across the week" />;
