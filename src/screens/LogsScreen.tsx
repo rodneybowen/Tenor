@@ -195,15 +195,7 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
           className={'mood-strip' + (snapping ? ' mood-strip--snap' : '')}
           style={{ transform: `translateX(calc(-33.3333% + ${dragX}px))` }}
         >
-          <div className="mood-strip__panel">
-            <ChartPanel view={view} anchor={shiftPeriod(view, anchor, -1)} logs={logs} />
-          </div>
-          <div className="mood-strip__panel">
-            <ChartPanel view={view} anchor={anchor} logs={logs} />
-          </div>
-          <div className="mood-strip__panel">
-            <ChartPanel view={view} anchor={shiftPeriod(view, anchor, 1)} logs={logs} />
-          </div>
+          <SuperMoodLine view={view} anchor={anchor} logs={logs} />
         </div>
       </div>
     </>
@@ -384,9 +376,13 @@ function DayBody({
   );
 }
 
-// Single chart panel inside the swipeable strip. Looks up its own
-// adjacent-period carry-over so each panel is self-contained.
-function ChartPanel({
+// Single chart spanning three consecutive periods — prev / current /
+// next — rendered as ONE SVG so the spline is continuous across panel
+// boundaries. The swipe strip translates this whole SVG; the wrap's
+// overflow clips to the current panel by default. By computing every
+// point in a shared coord space, we sidestep the seam mismatch that
+// per-panel SVGs produced.
+function SuperMoodLine({
   view,
   anchor,
   logs,
@@ -395,27 +391,60 @@ function ChartPanel({
   anchor: Date;
   logs: LogEntry[];
 }) {
+  const prevAnchor = shiftPeriod(view, anchor, -1);
+  const nextAnchor = shiftPeriod(view, anchor, 1);
+  const anchors: Date[] = [prevAnchor, anchor, nextAnchor];
+
+  const pts: MoodPoint[] = [];
   if (view === 'D') {
-    const key = periodDayKeys('D', anchor)[0];
-    const dayLogs = logsForDay(key, logs);
-    const prevDate = new Date(anchor);
-    prevDate.setDate(prevDate.getDate() - 1);
-    const nextDate = new Date(anchor);
-    nextDate.setDate(nextDate.getDate() + 1);
-    const leadingQ = lastQuadrantOfDay(prevDate, logs);
-    const trailingQ = firstQuadrantOfDay(nextDate, logs);
-    // Empty day still renders the bands so the swipe strip stays the
-    // same height across periods — only the spline + dots are absent.
-    return (
-      <DayMoodLine
-        logs={dayLogs}
-        leadingQ={leadingQ}
-        trailingQ={trailingQ}
-        edge
-      />
-    );
+    // Each day gets a 1/3 slot. Nodes inside a day uniformly fill it.
+    anchors.forEach((a, panelIdx) => {
+      const key = periodDayKeys('D', a)[0];
+      const dayLogs = logsForDay(key, logs);
+      const flat: Quadrant[] = [];
+      for (const l of dayLogs) {
+        for (const q of quadrantsForLog(l)) flat.push(q);
+      }
+      flat.forEach((q, i) => {
+        const txInPanel = flat.length === 1 ? 0.5 : i / (flat.length - 1);
+        pts.push({
+          tx: (panelIdx + txInPanel) / 3,
+          ty: BAND_Y[q],
+          quadrant: q,
+        });
+      });
+    });
+  } else {
+    // Each weekday gets a 1/21 slot (7 days × 3 panels).
+    anchors.forEach((a, panelIdx) => {
+      const keys = periodDayKeys('W', a);
+      keys.forEach((k, dayIdx) => {
+        const dayNodes: Quadrant[] = [];
+        for (const l of logsForDay(k, logs)) {
+          for (const q of quadrantsForLog(l)) dayNodes.push(q);
+        }
+        const n = dayNodes.length;
+        if (n === 0) return;
+        dayNodes.forEach((q, j) => {
+          const txInPanel = (dayIdx + (j + 0.5) / n) / 7;
+          pts.push({
+            tx: (panelIdx + txInPanel) / 3,
+            ty: BAND_Y[q],
+            quadrant: q,
+          });
+        });
+      });
+    });
   }
-  return <WeekMoodLine anchor={anchor} logs={logs} />;
+
+  return (
+    <MoodLine
+      pts={pts}
+      ariaLabel={view === 'D' ? 'Mood across the day' : 'Mood across the week'}
+      edge
+      panels={3}
+    />
+  );
 }
 
 // Vertical band order (top → bottom): HEP, LEP, baseline, LEN, HEN.
@@ -456,138 +485,41 @@ function quadrantsForLog(log: LogEntry): Quadrant[] {
 
 type MoodPoint = { tx: number; ty: number; quadrant: Quadrant };
 
-export function DayMoodLine({
-  logs,
-  leadingQ,
-  trailingQ,
-  edge = false,
-}: {
-  logs: LogEntry[];
-  leadingQ?: Quadrant;
-  trailingQ?: Quadrant;
-  edge?: boolean;
-}) {
+export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
   // Flatten across logs in chronological order: log 1's nodes, then
   // log 2's nodes, etc. X spaces uniformly across the total count.
+  // Used standalone by LogThreadScreen — the swipeable Logs strip uses
+  // SuperMoodLine instead so the spline can span 3 periods.
   const flat: Quadrant[] = [];
   for (const l of logs) {
     for (const q of quadrantsForLog(l)) flat.push(q);
   }
-  const pts: MoodPoint[] = [];
-  // Carry-over from previous day — invisible anchor that lets the spline
-  // enter from off-screen left so the chart visibly continues across
-  // period boundaries when the user swipes between days.
-  if (edge && leadingQ) pts.push({ tx: -0.12, ty: BAND_Y[leadingQ], quadrant: leadingQ });
-  flat.forEach((q, i) => {
-    pts.push({
-      tx: flat.length === 1 ? 0.5 : i / (flat.length - 1),
-      ty: BAND_Y[q],
-      quadrant: q,
-    });
-  });
-  if (edge && trailingQ) pts.push({ tx: 1.12, ty: BAND_Y[trailingQ], quadrant: trailingQ });
-  return <MoodLine pts={pts} ariaLabel="Mood across the day" edge={edge} />;
-}
-
-function WeekMoodLine({ anchor, logs }: { anchor: Date; logs: LogEntry[] }) {
-  // Each weekday owns a 1/7 horizontal slot. Within a day, its nodes
-  // (one per unique quadrant per log, same rule as DayMoodLine) are
-  // distributed evenly inside that slot. Empty days contribute nothing
-  // — the spline connects the last node of the previous logged day
-  // directly to the first node of the next logged day, jumping the
-  // empty slot. Leading / trailing empty days simply trim the line.
-  const keys = periodDayKeys('W', anchor);
-  const pts: MoodPoint[] = [];
-  keys.forEach((k, dayIdx) => {
-    const dayNodes: Quadrant[] = [];
-    for (const l of logsForDay(k, logs)) {
-      for (const q of quadrantsForLog(l)) dayNodes.push(q);
-    }
-    const n = dayNodes.length;
-    if (n === 0) return;
-    dayNodes.forEach((q, j) => {
-      pts.push({
-        tx: (dayIdx + (j + 0.5) / n) / 7,
-        ty: BAND_Y[q],
-        quadrant: q,
-      });
-    });
-  });
-  // Carry-over from the previous week's last logged day, and into the
-  // next week's first logged day — same continuity story as the daily
-  // chart, just bookended by whole weeks.
-  const prevWeekAnchor = shiftPeriod('W', anchor, -1);
-  const nextWeekAnchor = shiftPeriod('W', anchor, 1);
-  const leadingQ = lastQuadrantOfWeek(prevWeekAnchor, logs);
-  const trailingQ = firstQuadrantOfWeek(nextWeekAnchor, logs);
-  const withCarry: MoodPoint[] = [];
-  if (leadingQ) withCarry.push({ tx: -0.12, ty: BAND_Y[leadingQ], quadrant: leadingQ });
-  withCarry.push(...pts);
-  if (trailingQ) withCarry.push({ tx: 1.12, ty: BAND_Y[trailingQ], quadrant: trailingQ });
-  // Always render the chart shell (bands) so empty weeks inside the
-  // swipe strip keep the same height as logged weeks.
-  return <MoodLine pts={withCarry} ariaLabel="Mood across the week" edge />;
-}
-
-function dayKeyOf(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
-function lastQuadrantOfDay(date: Date, logs: LogEntry[]): Quadrant | undefined {
-  const dayLogs = logsForDay(dayKeyOf(date), logs);
-  for (let i = dayLogs.length - 1; i >= 0; i--) {
-    const qs = quadrantsForLog(dayLogs[i]);
-    if (qs.length) return qs[qs.length - 1];
-  }
-  return undefined;
-}
-
-function firstQuadrantOfDay(date: Date, logs: LogEntry[]): Quadrant | undefined {
-  const dayLogs = logsForDay(dayKeyOf(date), logs);
-  for (const l of dayLogs) {
-    const qs = quadrantsForLog(l);
-    if (qs.length) return qs[0];
-  }
-  return undefined;
-}
-
-function lastQuadrantOfWeek(anchor: Date, logs: LogEntry[]): Quadrant | undefined {
-  const keys = periodDayKeys('W', anchor);
-  for (let i = keys.length - 1; i >= 0; i--) {
-    const dayLogs = logsForDay(keys[i], logs);
-    for (let j = dayLogs.length - 1; j >= 0; j--) {
-      const qs = quadrantsForLog(dayLogs[j]);
-      if (qs.length) return qs[qs.length - 1];
-    }
-  }
-  return undefined;
-}
-
-function firstQuadrantOfWeek(anchor: Date, logs: LogEntry[]): Quadrant | undefined {
-  const keys = periodDayKeys('W', anchor);
-  for (const k of keys) {
-    const dayLogs = logsForDay(k, logs);
-    for (const l of dayLogs) {
-      const qs = quadrantsForLog(l);
-      if (qs.length) return qs[0];
-    }
-  }
-  return undefined;
+  const pts: MoodPoint[] = flat.map((q, i) => ({
+    tx: flat.length === 1 ? 0.5 : i / (flat.length - 1),
+    ty: BAND_Y[q],
+    quadrant: q,
+  }));
+  return <MoodLine pts={pts} ariaLabel="Mood across the day" />;
 }
 
 function MoodLine({
   pts,
   ariaLabel,
   edge = false,
+  panels = 1,
 }: {
   pts: MoodPoint[];
   ariaLabel: string;
   edge?: boolean;
+  /** Number of period-panels the chart spans horizontally. The
+   *  swipeable strip uses panels=3 so prev / current / next render
+   *  as one continuous spline — no seam between adjacent SVGs. */
+  panels?: number;
 }) {
-  const W = 320;
   // Edge mode is 3/4 as tall and runs flush to the SVG's horizontal
   // edges — points with tx<0 or tx>1 (carry-over from prev/next period)
   // land off-screen and only contribute their connecting segment.
+  const W = 320 * panels;
   const H = edge ? 150 : 200;
   const padX = edge ? 0 : 12;
   const padY = 12;

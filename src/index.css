@@ -1901,6 +1901,43 @@ button {
   height: 200px;
   display: block;
 }
+/* Edge-to-edge variant used in Logs (D and W views). The horizontal
+   breakout lives on .mood-strip-wrap below — here we just opt out of
+   the fixed 200px height so the SVG follows its viewBox aspect ratio
+   (320×150) within its panel. */
+.day-mood--edge {
+  width: 100%;
+  height: auto;
+}
+
+/* Swipeable mood-chart strip. The wrap is edge-to-edge (breaks the
+   shell's 20px padding) and clips horizontally; the inner strip is 3×
+   as wide and holds the previous / current / next charts side by side.
+   `transform: translateX(...)` is driven by the pointer drag in
+   LogsScreen, with a snap transition applied on release. */
+.mood-strip-wrap {
+  width: calc(100% + 40px);
+  margin-left: -20px;
+  margin-right: -20px;
+  overflow: hidden;
+  /* Lets vertical scroll pass through while we capture horizontal. */
+  touch-action: pan-y;
+}
+.mood-strip {
+  /* One wide SVG (300% of the wrap) sits inside; the wrap clips to the
+     current panel. A single SVG keeps the spline continuous across
+     period boundaries — splitting into 3 SVGs caused visible breaks at
+     the seams because each panel computed its spline independently. */
+  width: 300%;
+  will-change: transform;
+}
+.mood-strip--snap {
+  transition: transform 0.22s ease-out;
+}
+.mood-strip > .day-mood {
+  /* The SVG fills the strip; height auto follows the wider viewBox. */
+  width: 100%;
+}
 
 /* ── Week stacked bars ─────────────────────── */
 .week-bars {

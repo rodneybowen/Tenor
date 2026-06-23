@@ -630,60 +630,78 @@ Sourced from the user's published Google Sheet (CSV-pulled). If vocabulary list 
 
 ---
 
-## Detailed Flow: Emotion Selector v2 — Starburst + A/B Variant System (speced Jun 15 2026, not yet built)
+## Detailed Flow: Emotion Selector v2 — Starburst Variant (speced Jun 15 2026, clarified Jun 22 2026, not yet built)
 
-Two parallel variants of the emotion selector, user-chosen on first encounter and switchable any time in Account settings. Downstream output (chips, review screen, log format, quadrant colors) is **identical** between variants — no data model changes beyond the variant preference itself.
+Two parallel variants of the emotion selector. Both are permanent — no A/B test framing. Users switch in Account settings at any time. **Classic variant stays exactly as-is.** Starburst adds new data fields to logs (see data model below).
 
 ### Variant definitions
-- **`'classic'`** — existing 4-quadrant flat grid (HEP/LEP/LEN/HEN picker → fisheye chip plane). Default until the user makes a choice.
-- **`'starburst'`** — 8 named base emotions arranged radially on the same 2D pannable fisheye plane. Centering on a base emotion offers "select this" or "go deeper" into ~6-8 sub-emotions (also radial). Breadcrumb at top tracks depth: `[Base] →` while panning sub-layer, `[Base] → [Specific]` when centered on a sub-emotion.
+- **`'classic'`** — existing 4-quadrant flat grid (HEP/LEP/LEN/HEN picker → fisheye chip plane). Default for all users unless explicitly changed.
+- **`'starburst'`** — **6 base emotions** arranged radially on the same 2D pannable fisheye plane plus a **"numb" chip at the center**. No quadrant labels shown to the user. Tapping a base emotion reveals its sub-emotions blooming outward on the same plane. Outer Junto wheel ring (most specific emotions) is NOT shown in the grid — only accessible via speak/type NLP classification.
 
-### Profiles columns (migration `0010_emotion_ui_ab.sql`)
+### Profiles columns (migration `0010_emotion_ui.sql`)
 - `emotion_ui TEXT NOT NULL DEFAULT 'classic'` — current active variant
-- `emotion_ui_initial TEXT` — first choice made on the prompt (never changes after set; NULL = hasn't seen the prompt yet)
-- `emotion_ui_prompt_shown BOOLEAN NOT NULL DEFAULT false` — whether the one-time prompt has been shown
 
-No usage counters — deliberate decision to avoid behavioral telemetry in a mental health context.
+No usage counters, no prompt-shown flag, no initial-choice tracking — deliberate decision to avoid behavioral telemetry in a mental health context.
 
-### One-time variant prompt
-- **Trigger:** `IntersectionObserver` on the `lm-section--quads` element in `LogMethodScreen`. Fires once when that section enters the viewport. Only shows if `profiles.emotion_ui_prompt_shown === false` (or user is a guest → skip prompt, use classic silently).
-- **Copy:** "Quick question — how do you prefer to find your feelings?" with two buttons:
-  - **"How intense"** → sets `emotion_ui = 'classic'`, `emotion_ui_initial = 'classic'`, `emotion_ui_prompt_shown = true`
-  - **"What kind"** → sets `emotion_ui = 'starburst'`, `emotion_ui_initial = 'starburst'`, `emotion_ui_prompt_shown = true`
-  - Helper text below: *"You can change this any time in settings."*
-- **Presentation:** modal/sheet style, same bubble aesthetic as the current definition card. Appears below the quadrant section, does not block navigation. User can also dismiss it without choosing (tap outside) — in that case prompt remains shown=false and will appear again next visit.
-- **Saves** to `profiles` via Supabase update immediately on button tap. For guests, choice is session-only (no Supabase write).
+### No one-time prompt
+There is no on-scroll prompt in `LogMethodScreen`. Variant is a settings toggle only (see AccountScreen toggle below). `LogMethodScreen` needs no changes for this feature.
 
 ### Starburst layout
-- Same 2D pannable plane and fisheye as classic. Same pan gestures (touch, trackpad, mouse drag), same haptics, same selection cap (5 emotions), same chip aesthetics (gradient lit-sphere, quadrant color).
-- **Layer 1 — base emotions:** 8 chips arranged radially at 45° increments around a center point (radius ≈ 200px from center). Chips colored by their quadrant. Larger than classic chips (~130px) since there are fewer per view.
-  - HEP (yellow): **Joyful** (0°), **Surprised** (45°)
-  - LEP (green): **Loving** (90°), **Peaceful** (135°)
-  - LEN (blue): **Sad** (180°), **Afraid** (225°)
-  - HEN (red): **Disgusted** (270°), **Angry** (315°)
-- **Definition card:** same card component as classic but copy reads: *"[Emotion] — select this, or explore more specific feelings below."* Two actions: **"Select [emotion]"** (proceeds to review) and **"Go deeper →"** (drills into layer 2).
-- **Layer 2 — sub-emotions:** on "Go deeper", the plane transitions to show sub-emotions of the selected base (also radially arranged, same 45° spacing, up to 8 items — fewer items → wider angular spacing). Breadcrumb appears at top: `Joyful →`. Definition card shows the sub-emotion name + definition; only one action: **"Select [sub-emotion]"**. Back gesture or back button returns to layer 1.
-- **Breadcrumb:** top of screen, Montserrat Label, neutral-400. Updates live as user pans: `Joyful →` while on layer 2 undecided, `Joyful → Elated` when centered on a specific sub-emotion.
+- Same 2D pannable plane and fisheye as classic. Same pan gestures (touch, trackpad, mouse drag), same haptics, same selection cap (5 emotions), same chip aesthetics (gradient lit-sphere).
+- **Center chip — "numb":** a single neutral chip sits at the exact center of the plane (0, 0). Neutral palette (neutral-400 background). Selectable as a standalone emotion — logs `emotion_name = 'numb'`, `base_emotion = null`. Represents emotional numbness / inability to identify a feeling. Snap-centers like any other chip.
+- **Layer 1 — base emotions (initial view):** 6 chips arranged radially at **60° increments** around the center (radius ≈ 200px). Each chip uses its own per-emotion palette (see Color Palettes → Starburst). Chips are larger than classic (~130px) since there are fewer per view. **Sub-emotion chips are hidden until a base emotion is tapped.**
+  - Clockwise from top: **Surprise** (0°), **Joy** (60°), **Love** (120°), **Fear** (180°), **Anger** (240°), **Sadness** (300°)
+  - Palette mapping: Surprise → Feijoa, Joy → Ripe Lemon, Love → Lilac Bush (500), Fear → Geraldine, Anger → Hit Pink, Sadness → Picton Blue
+- **Definition card (base emotion):** appears when user snap-centers on a base emotion. Copy: *"[Emotion] — select this, or explore more specific feelings."* Two actions: **"Select [emotion]"** (proceeds to review) and **"Go deeper →"** (reveals sub-emotions).
+- **Layer 2 — sub-emotions (bloom on tap):** tapping "Go deeper" reveals sub-emotion chips blooming outward from the selected base emotion on the **same plane** (not a separate screen). They radiate at equal angular spacing from the base emotion's position. Breadcrumb at top updates: `Joy →`. Definition card shows sub-emotion name + definition; single action: **"Select [sub-emotion]"**. Back arrow or back gesture collapses sub-emotions back to layer 1.
+- **Breadcrumb:** top of screen, Montserrat Label, neutral-400. Updates live: blank at layer 1, `[Base] →` while in layer 2.
 
-### Starburst emotion hierarchy (adapted from circumplex model — NOT copied verbatim from any third-party wheel)
+### Selection model
+- **Select base emotion:** logs `emotion_name = 'joy'`, `base_emotion = 'joy'`. No sub-emotion selected.
+- **Select sub-emotion:** auto-deselects the parent base emotion chip; logs `emotion_name = 'excited'`, `base_emotion = 'joy'`. The sub-emotion inherits the parent's palette for chip coloring.
+- **Select "numb":** logs `emotion_name = 'numb'`, `base_emotion = null`.
+- Multi-select cap of 5 applies across the starburst plane (same as classic).
+
+### Data model — logs table (migration `0010_emotion_ui.sql`)
+Starburst mode requires two new columns on `public.logs`:
+- `base_emotion TEXT` — the 6 base emotion names (`surprise | joy | love | fear | anger | sadness`), or NULL for classic-mode logs and "numb" selections.
+- Classic-mode logs leave `base_emotion` NULL. Quadrant field (`hep/hen/lep/len`) remains on all logs unchanged.
+- Visualizations switch based on `profiles.emotion_ui`:
+  - **classic:** 4 horizontal category lanes (HEP / HEN / LEP / LEN) — current behavior unchanged
+  - **starburst:** 6 category lanes in this order: **Surprise → Joy → Love → Fear → Anger → Sadness**, each colored by its palette primary (Feijoa-400, Ripe Lemon-400, Lilac Bush-500, Geraldine-400, Hit Pink-400, Picton Blue-400). No quadrant labels shown.
+  - All chart components that read `quadrant` for lane/color assignment need a conditional path for starburst mode reading `base_emotion` instead.
+
+### Starburst emotion hierarchy (sourced from the Junto Institute Emotion Wheel, Jun 15 2026)
+Source of truth for sub-emotions is the wheel image — reproduce vocabulary from there, do not invent words.
+
 ```
-HEP:
-  joyful     → cheerful, playful, enthusiastic, elated, hopeful, proud, amused, optimistic
-  surprised  → amazed, astonished, awe-struck, speechless, stunned, overwhelmed
+Surprise  (Feijoa)   → stunned, confused, amazed, overcome, moved, stimulated,
+                        astonished, awe-struck, speechless, astounded
 
-LEP:
-  peaceful   → serene, content, tranquil, satisfied, calm, touched, grounded
-  loving     → affectionate, compassionate, romantic, tender, nostalgic, sentimental, moved
+Joy       (Ripe Lemon) → excited, optimistic, proud, cheerful, happy, content,
+                          peaceful, enthusiastic, hopeful, playful, amused,
+                          delighted, jovial, pleased, satisfied, serene, tranquil
 
-LEN:
-  sad        → lonely, unhappy, disappointed, gloomy, hopeless, disheartened, shameful, empty
-  afraid     → anxious, nervous, terrified, insecure, worried, dreadful, panicked
+Love      (Lilac Bush 500) → enchanted, romantic, affectionate, sentimental,
+                              grateful, appreciative, thankful, nostalgic,
+                              tender, compassionate, warmhearted, passionate,
+                              enamored, rapturous, enthralled, jubilant, elated
 
-HEN:
-  angry      → enraged, frustrated, irritable, resentful, aggravated, annoyed, hostile
-  disgusted  → contemptuous, revolted, repelled, appalled, scornful
+Fear      (Geraldine) → scared, terrified, insecure, nervous, horrified,
+                         frightened, helpless, panicked, hysterical, inferior,
+                         inadequate, worried, anxious, mortified, dreadful
+
+Anger     (Hit Pink)  → irritable, exasperated, enraged, hostile, jealous,
+                         disgusted, hateful, agitated, frustrated, annoyed,
+                         aggravated, resentful, envious, contemptuous, revolted
+
+Sadness   (Picton Blue) → hurt, unhappy, disappointed, shameful, lonely,
+                           gloomy, isolated, neglected, hopeless, depressed,
+                           shocked, bewildered, disillusioned, perplexed,
+                           agonized, disturbed, miserable, disheartened,
+                           dismayed, displeased, regretful, guilty
 ```
-Each sub-emotion inherits its parent's quadrant for coloring. Definitions for sub-emotions reuse the existing `EMOTION_DEFINITIONS` map where the word exists; new words need brief definitions added to `theme/emotions.ts`.
+Each sub-emotion inherits its parent base emotion's palette for coloring. Definitions reuse `EMOTION_DEFINITIONS` where the word exists; new words need brief definitions added to `theme/emotions.ts`.
 
 ### AccountScreen toggle
 New `acct-section` between "Reminders" and "Sign out" labeled **"Emotion categories"**. Two-option inline selector (pill toggle, same styling as a segmented control):
@@ -728,7 +746,116 @@ Not Material 3's default Roboto — these are Tenor's brand fonts.
 
 ### Color Palettes
 
-> Use neutrals for ~90% of the UI. Emotion colors are functional — yellow = HEP, green = LEP, blue = LEN, red = HEN. Light shades (50–200) can be used in background blobs/gradients. Saturated shades (400–600) are for functional UI only.
+> Use neutrals for ~90% of the UI. Emotion colors are functional — reserved for their categorical roles only. Light shades (50–200) can be used in background blobs/gradients. Saturated shades (400–600) are for functional UI only.
+
+#### Classic variant quadrant palette (HEP / LEP / LEN / HEN)
+Used by the classic emotion selector, mood line, weekly dots, breakdown bubbles, and any screen that references the 4-quadrant system. **400 is the functional primary for each.**
+
+> **Note (Jun 15 2026):** These quadrant colors remain in use for the classic variant. The starburst variant uses the per-emotion palette below instead, with no quadrant labels exposed to the user. Internally, each starburst base emotion maps to a quadrant for data storage compatibility — see "Emotion Selector v2" spec.
+
+#### Starburst variant — per-base-emotion palette (added Jun 15 2026)
+Six named palettes, one per base emotion (6 base emotions = 6 palettes, perfect 1:1). **400 is the primary for each** — exception: Lilac Bush uses **500 as de facto primary** since 400 is too light relative to the other five.
+
+**Palette → emotion mapping (override from sketch if it differs):**
+
+| Base Emotion | Palette | Primary shade |
+|---|---|---|
+| Surprise | Feijoa | 400 |
+| Joy | Ripe Lemon | 400 |
+| Love | Lilac Bush | **500** |
+| Fear | Geraldine | 400 |
+| Anger | Hit Pink | 400 |
+| Sadness | Picton Blue | 400 |
+
+**Geraldine** *(starburst: Fear @ 400)*
+| Shade | Hex |
+|---|---|
+| 50 | `#fef2f2` |
+| 100 | `#ffe1e2` |
+| 200 | `#ffc9ca` |
+| 300 | `#fea3a5` |
+| 400 | `#fc7679` |
+| 500 | `#f43f43` |
+| 600 | `#e12125` |
+| 700 | `#bd181c` |
+| 800 | `#9d171a` |
+| 900 | `#821a1c` |
+| 950 | `#470809` |
+
+**Hit Pink** *(starburst: Anger @ 400)*
+| Shade | Hex |
+|---|---|
+| 50 | `#fff4ed` |
+| 100 | `#ffe6d5` |
+| 200 | `#fec8aa` |
+| 300 | `#fda477` |
+| 400 | `#fb713c` |
+| 500 | `#f94b16` |
+| 600 | `#ea310c` |
+| 700 | `#c2210c` |
+| 800 | `#9a1c12` |
+| 900 | `#7c1a12` |
+| 950 | `#430907` |
+
+**Ripe Lemon** *(starburst: Joy @ 400)*
+| Shade | Hex |
+|---|---|
+| 50 | `#fdfee8` |
+| 100 | `#fdffc2` |
+| 200 | `#ffff88` |
+| 300 | `#fff844` |
+| 400 | `#feeb11` |
+| 500 | `#fbdd04` |
+| 600 | `#cea500` |
+| 700 | `#a47604` |
+| 800 | `#875c0c` |
+| 900 | `#734b10` |
+| 950 | `#432705` |
+
+**Feijoa** *(starburst: Surprise @ 400)*
+| Shade | Hex |
+|---|---|
+| 50 | `#f4f9ec` |
+| 100 | `#e5f0d7` |
+| 200 | `#cde3b3` |
+| 300 | `#a9ce80` |
+| 400 | `#8fbc5f` |
+| 500 | `#71a141` |
+| 600 | `#567f31` |
+| 700 | `#436229` |
+| 800 | `#384f25` |
+| 900 | `#314423` |
+| 950 | `#17240f` |
+
+**Picton Blue** *(starburst: Sadness @ 400)*
+| Shade | Hex |
+|---|---|
+| 50 | `#f1f9fe` |
+| 100 | `#e3f1fb` |
+| 200 | `#c0e3f7` |
+| 300 | `#89cdf0` |
+| 400 | `#51b7e7` |
+| 500 | `#229bd5` |
+| 600 | `#147cb5` |
+| 700 | `#126392` |
+| 800 | `#135479` |
+| 900 | `#154765` |
+| 950 | `#0e2d43` |
+
+**Lilac Bush** *(starburst: Love @ 500)*
+| Shade | Hex |
+|---|---|
+| 50 | `#f7f5fd` |
+| 100 | `#f0ecfb` |
+| 200 | `#e4dcf8` |
+| 300 | `#d0c1f1` |
+| 400 | `#b79de8` |
+| 500 | `#a178de` |
+| 600 | `#8f57d0` |
+| 700 | `#7f44bd` |
+| 800 | `#6a399e` |
+| 900 | `#583082` |
+| 950 | `#381e57` |
 
 **Neutral**
 | Shade | Hex |
@@ -957,7 +1084,7 @@ Full as-built notes in "Detailed Flow: Notification / Reminder System" above. Sp
 ### ~~NEXT UP — Logo Intro Animation (Splash)~~ — **built Jun 15 2026**
 See "Detailed Flow: Logo Intro Animation (Splash)" → "As-built notes" above for what shipped. Assets in `public/animations/intro.{lottie,json}`, component at `src/components/IntroSplash.tsx`, wired in `App.tsx` via rising-edge effect over `screenIsAuth`.
 
-### NEXT UP (added Jun 15 2026) — Emotion Selector v2: starburst UI + A/B variant system
+### NEXT UP (added Jun 15 2026, spec locked Jun 22 2026) — Emotion Selector v2: starburst UI + settings toggle
 Full spec in "Detailed Flow: Emotion Selector v2 — Starburst + A/B" below (to be added). Classic (HEP/LEP/LEN/HEN quadrant grid) vs Starburst (8 named base emotions radial fisheye → drill to sub-emotions). First-time variant prompt on `LogMethodScreen` when quadrant section scrolls into view: "How intense your feeling is" vs "What kind of feeling it is." Both initial pick and per-open usage tracked per user on `profiles` (migration `0010_emotion_ui_ab.sql`). AccountScreen toggle. Data model: hierarchical vocab alongside existing flat `VocabByCategory`; downstream (chips, review screen) unchanged.
 
 ### Also open (no fixed slot yet)
