@@ -1,4 +1,4 @@
-import type { LogMode, Quadrant } from '../theme/emotions';
+import type { BaseEmotion, LogMode, Quadrant } from '../theme/emotions';
 
 export interface LogEntry {
   id: string;
@@ -12,6 +12,10 @@ export interface LogEntry {
   keywords: string[];
   /** emotion quadrant(s) this entry touched — drives dot + card colors */
   quadrants: Quadrant[];
+  /** Starburst base emotion for this log (migration 0010). NULL when
+   *  the log came from classic mode, or when the user picked the
+   *  centre "numb" chip. Drives the 6-lane visualization variant. */
+  baseEmotion?: BaseEmotion | null;
   /** raw context the user produced — the transcript (speak), the typed
    *  text (type/scan, later), or the optional "what made you feel that
    *  way" note (emotion-selector). Empty/undefined for chip-only logs. */

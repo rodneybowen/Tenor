@@ -17,16 +17,23 @@ import {
   type LogView,
 } from '../data/mockLogs';
 import {
+  STARBURST_LANE_ORDER,
   dotBackground,
+  laneColor,
   quadrantBlendBackground,
   quadrantColor,
   shadeQuadrant,
+  type BaseEmotion,
+  type LaneKey,
   type Quadrant,
 } from '../theme/emotions';
 import DayLogList from '../components/DayLogList';
 
+type EmotionUi = 'classic' | 'starburst';
+
 interface Props {
   logs: LogEntry[];
+  emotionUi: EmotionUi;
   onOpenLog: (id: string) => void;
 }
 
@@ -70,7 +77,7 @@ function mulberry32(seed: number): () => number {
 // Top-level screen
 // ────────────────────────────────────────────────────────────────────
 
-export default function LogsScreen({ logs, onOpenLog }: Props) {
+export default function LogsScreen({ logs, emotionUi, onOpenLog }: Props) {
   const [view, setView] = useState<LogView>('W');
   // Anchor = first date of the current period. Defaults to the week
   // containing TODAY so a freshly-opened Logs tab feels current.
@@ -195,7 +202,7 @@ export default function LogsScreen({ logs, onOpenLog }: Props) {
           className={'mood-strip' + (snapping ? ' mood-strip--snap' : '')}
           style={{ transform: `translateX(calc(-33.3333% + ${dragX}px))` }}
         >
-          <SuperMoodLine view={view} anchor={anchor} logs={logs} />
+          <SuperMoodLine view={view} anchor={anchor} logs={logs} emotionUi={emotionUi} />
         </div>
       </div>
     </>
@@ -386,10 +393,12 @@ function SuperMoodLine({
   view,
   anchor,
   logs,
+  emotionUi,
 }: {
   view: LogView;
   anchor: Date;
   logs: LogEntry[];
+  emotionUi: EmotionUi;
 }) {
   const prevAnchor = shiftPeriod(view, anchor, -1);
   const nextAnchor = shiftPeriod(view, anchor, 1);
@@ -401,16 +410,16 @@ function SuperMoodLine({
     anchors.forEach((a, panelIdx) => {
       const key = periodDayKeys('D', a)[0];
       const dayLogs = logsForDay(key, logs);
-      const flat: Quadrant[] = [];
+      const flat: LaneKey[] = [];
       for (const l of dayLogs) {
-        for (const q of quadrantsForLog(l)) flat.push(q);
+        for (const k of lanesForLog(l, emotionUi)) flat.push(k);
       }
-      flat.forEach((q, i) => {
+      flat.forEach((k, i) => {
         const txInPanel = flat.length === 1 ? 0.5 : i / (flat.length - 1);
         pts.push({
           tx: (panelIdx + txInPanel) / 3,
-          ty: BAND_Y[q],
-          quadrant: q,
+          ty: bandYFor(emotionUi, k),
+          lane: k,
         });
       });
     });
@@ -419,18 +428,18 @@ function SuperMoodLine({
     anchors.forEach((a, panelIdx) => {
       const keys = periodDayKeys('W', a);
       keys.forEach((k, dayIdx) => {
-        const dayNodes: Quadrant[] = [];
+        const dayNodes: LaneKey[] = [];
         for (const l of logsForDay(k, logs)) {
-          for (const q of quadrantsForLog(l)) dayNodes.push(q);
+          for (const ln of lanesForLog(l, emotionUi)) dayNodes.push(ln);
         }
         const n = dayNodes.length;
         if (n === 0) return;
-        dayNodes.forEach((q, j) => {
+        dayNodes.forEach((ln, j) => {
           const txInPanel = (dayIdx + (j + 0.5) / n) / 7;
           pts.push({
             tx: (panelIdx + txInPanel) / 3,
-            ty: BAND_Y[q],
-            quadrant: q,
+            ty: bandYFor(emotionUi, ln),
+            lane: ln,
           });
         });
       });
@@ -443,28 +452,55 @@ function SuperMoodLine({
       ariaLabel={view === 'D' ? 'Mood across the day' : 'Mood across the week'}
       edge
       panels={3}
+      emotionUi={emotionUi}
     />
   );
 }
 
-// Vertical band order (top → bottom): HEP, LEP, baseline, LEN, HEN.
-// Y-coordinate (0..1, 0 = top) for each quadrant's band center.
-const BAND_Y: Record<Quadrant, number> = {
+// Vertical band order. Classic: HEP, LEP, baseline, LEN, HEN (4 lanes,
+// baseline between positive/negative). Starburst: Surprise → Joy →
+// Love → Fear → Anger → Sadness (6 lanes, no baseline).
+const BAND_Y_CLASSIC: Record<Quadrant, number> = {
   hep: 0.12,
   lep: 0.36,
   len: 0.64,
   hen: 0.88,
 };
+const BAND_Y_STARBURST: Record<BaseEmotion, number> = STARBURST_LANE_ORDER.reduce(
+  (acc, key, i) => {
+    // Centre each lane within its 1/6 horizontal slice.
+    acc[key] = (i + 0.5) / STARBURST_LANE_ORDER.length;
+    return acc;
+  },
+  {} as Record<BaseEmotion, number>,
+);
 
-// Node granularity = unique emotion category in encounter order.
-// A single log can yield 1–4 nodes — one per distinct quadrant
-// appearing in its chips, in chip order, with duplicates dropped.
-// Same rule for every input mode (speak/type orders chips by
-// transcript position; emotion-selector orders by selection).
-// If a log has no chips with quadrant tags, fall back to the
-// precomputed `quadrants` array so the log still contributes
-// at least one node and the line doesn't gap.
-function quadrantsForLog(log: LogEntry): Quadrant[] {
+/** Ordered list of lane keys for the current variant — top-to-bottom
+ *  order matches the visual band stack. */
+function bandKeysFor(emotionUi: EmotionUi): LaneKey[] {
+  return emotionUi === 'starburst'
+    ? STARBURST_LANE_ORDER
+    : (['hep', 'lep', 'len', 'hen'] as Quadrant[]);
+}
+
+/** Y-position (0..1, 0 = top) for a lane in the current variant. */
+function bandYFor(emotionUi: EmotionUi, key: LaneKey): number {
+  if (emotionUi === 'starburst') return BAND_Y_STARBURST[key as BaseEmotion];
+  return BAND_Y_CLASSIC[key as Quadrant];
+}
+
+// Node granularity = one per distinct lane the log touches, in
+// encounter order. In classic mode, "lane" = chip quadrant. In
+// starburst mode, "lane" = the log's base_emotion (single value per
+// log — all chips on the log share that lane). Falls back to the
+// precomputed `quadrants` array when chip-level data is missing.
+function lanesForLog(log: LogEntry, emotionUi: EmotionUi): LaneKey[] {
+  if (emotionUi === 'starburst') {
+    // Starburst stores one base per LOG (column on the log row), so a
+    // single node per log unless we want to fan out to multiple lanes.
+    // The spec says lanes come from base_emotion, so one lane per log.
+    return log.baseEmotion ? [log.baseEmotion] : [];
+  }
   const seen = new Set<Quadrant>();
   const seq: Quadrant[] = [];
   const chips = log.chips ?? [];
@@ -483,23 +519,30 @@ function quadrantsForLog(log: LogEntry): Quadrant[] {
   return seq;
 }
 
-type MoodPoint = { tx: number; ty: number; quadrant: Quadrant };
+// Legacy alias kept for callers (DayMoodLine, LogThreadScreen) that
+// still operate on the classic 4-quadrant grouping.
+function quadrantsForLog(log: LogEntry): Quadrant[] {
+  return lanesForLog(log, 'classic') as Quadrant[];
+}
+
+type MoodPoint = { tx: number; ty: number; lane: LaneKey };
 
 export function DayMoodLine({ logs }: { logs: LogEntry[] }) {
-  // Flatten across logs in chronological order: log 1's nodes, then
-  // log 2's nodes, etc. X spaces uniformly across the total count.
-  // Used standalone by LogThreadScreen — the swipeable Logs strip uses
-  // SuperMoodLine instead so the spline can span 3 periods.
+  // Flatten across logs in chronological order. Always classic-mode
+  // here — LogThreadScreen renders a thread's mood line regardless
+  // of the user's variant choice (a thread is rooted in chip-quadrant
+  // colouring). The swipeable Logs strip uses SuperMoodLine which
+  // takes a variant prop.
   const flat: Quadrant[] = [];
   for (const l of logs) {
     for (const q of quadrantsForLog(l)) flat.push(q);
   }
   const pts: MoodPoint[] = flat.map((q, i) => ({
     tx: flat.length === 1 ? 0.5 : i / (flat.length - 1),
-    ty: BAND_Y[q],
-    quadrant: q,
+    ty: BAND_Y_CLASSIC[q],
+    lane: q,
   }));
-  return <MoodLine pts={pts} ariaLabel="Mood across the day" />;
+  return <MoodLine pts={pts} ariaLabel="Mood across the day" emotionUi="classic" />;
 }
 
 function MoodLine({
@@ -507,6 +550,7 @@ function MoodLine({
   ariaLabel,
   edge = false,
   panels = 1,
+  emotionUi,
 }: {
   pts: MoodPoint[];
   ariaLabel: string;
@@ -515,6 +559,8 @@ function MoodLine({
    *  swipeable strip uses panels=3 so prev / current / next render
    *  as one continuous spline — no seam between adjacent SVGs. */
   panels?: number;
+  /** Drives lane count: 4 horizontal bands (classic) or 6 (starburst). */
+  emotionUi: EmotionUi;
 }) {
   // Edge mode is 3/4 as tall and runs flush to the SVG's horizontal
   // edges — points with tx<0 or tx>1 (carry-over from prev/next period)
@@ -530,7 +576,7 @@ function MoodLine({
     x: padX + p.tx * innerW,
     y: padY + p.ty * innerH,
     tx: p.tx,
-    quadrant: p.quadrant,
+    lane: p.lane,
   }));
 
   // Two-point days get a single quadratic Bézier whose control point
@@ -545,8 +591,8 @@ function MoodLine({
   // user-space coords — colors flow smoothly along the curve.
   type Segment = {
     d: string;
-    from: Quadrant;
-    to: Quadrant;
+    from: LaneKey;
+    to: LaneKey;
     fromX: number;
     fromY: number;
     toX: number;
@@ -574,8 +620,8 @@ function MoodLine({
       const cy = midY + perpY * bulge;
       segments.push({
         d: `M ${p.x} ${p.y} Q ${cx} ${cy} ${next.x} ${next.y}`,
-        from: p.quadrant,
-        to: next.quadrant,
+        from: p.lane,
+        to: next.lane,
         fromX: p.x,
         fromY: p.y,
         toX: next.x,
@@ -596,8 +642,8 @@ function MoodLine({
       const c2y = next.y - (after.y - p.y) / 6;
       segments.push({
         d: `M ${p.x} ${p.y} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${next.x} ${next.y}`,
-        from: p.quadrant,
-        to: next.quadrant,
+        from: p.lane,
+        to: next.lane,
         fromX: p.x,
         fromY: p.y,
         toX: next.x,
@@ -617,26 +663,34 @@ function MoodLine({
       role="img"
       aria-label={ariaLabel}
     >
-      {/* Four colored bands: HEP yellow → LEP green → (baseline) → LEN blue → HEN coral. */}
-      {(['hep', 'lep', 'len', 'hen'] as Quadrant[]).map((q, i) => (
-        <rect
-          key={q}
-          x={padX}
-          y={padY + (i / 4) * innerH}
-          width={innerW}
-          height={innerH / 4}
-          fill={quadrantColor(q, 0.18)}
+      {/* Variant-aware bands. Classic: 4 lanes (HEP yellow → LEP green
+          → LEN blue → HEN coral) with a baseline between positive and
+          negative. Starburst: 6 lanes (Surprise → Joy → Love → Fear →
+          Anger → Sadness) and no baseline — positive/negative isn't a
+          meaningful split for the named-emotion model. */}
+      {(() => {
+        const keys = bandKeysFor(emotionUi);
+        return keys.map((k, i) => (
+          <rect
+            key={String(k)}
+            x={padX}
+            y={padY + (i / keys.length) * innerH}
+            width={innerW}
+            height={innerH / keys.length}
+            fill={laneColor(k, 0.18)}
+          />
+        ));
+      })()}
+      {emotionUi === 'classic' && (
+        <line
+          x1={padX}
+          x2={padX + innerW}
+          y1={padY + innerH / 2}
+          y2={padY + innerH / 2}
+          stroke="rgba(34, 34, 34, 0.35)"
+          strokeWidth={1}
         />
-      ))}
-      {/* Baseline divider between positive (above) and negative (below). */}
-      <line
-        x1={padX}
-        x2={padX + innerW}
-        y1={padY + innerH / 2}
-        y2={padY + innerH / 2}
-        stroke="rgba(34, 34, 34, 0.35)"
-        strokeWidth={1}
-      />
+      )}
       {/* One linearGradient per segment, running in user-space coords
           from the source point to the destination point — colors flow
           smoothly along each leg of the curve. */}
@@ -651,8 +705,8 @@ function MoodLine({
             x2={s.toX}
             y2={s.toY}
           >
-            <stop offset="0%" stopColor={quadrantColor(s.from, 0.95)} />
-            <stop offset="100%" stopColor={quadrantColor(s.to, 0.95)} />
+            <stop offset="0%" stopColor={laneColor(s.from, 0.95)} />
+            <stop offset="100%" stopColor={laneColor(s.to, 0.95)} />
           </linearGradient>
         ))}
       </defs>
@@ -677,7 +731,7 @@ function MoodLine({
             cx={p.x}
             cy={p.y}
             r={4.5}
-            fill={quadrantColor(p.quadrant, 1)}
+            fill={laneColor(p.lane, 1)}
             stroke="#ffffff"
             strokeWidth={1.5}
           />

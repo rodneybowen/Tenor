@@ -22,7 +22,7 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { formatClock, type LogEntry } from '../data/mockLogs';
-import type { Quadrant } from '../theme/emotions';
+import type { BaseEmotion, Quadrant } from '../theme/emotions';
 
 // ----- Env wiring --------------------------------------------------------
 
@@ -76,10 +76,19 @@ export interface DbProfile {
   /** Server-cycle tracking — clients don't touch these directly. */
   last_reminder_date: string | null;
   last_reminder_stage: number;
+  /** Emotion-selector variant the user sees. `'classic'` = existing
+   *  HEP/LEP/LEN/HEN quadrant grid; `'starburst'` = 6 base emotions on
+   *  the fisheye plane plus the center "numb" chip. Default `'classic'`
+   *  for all existing and new accounts; user-changeable in AccountScreen.
+   *  Drives both the selector flow and the visualization lane layout. */
+  emotion_ui: EmotionUi;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 }
+
+export type EmotionUi = 'classic' | 'starburst';
+export type { BaseEmotion };
 
 export interface DbLog {
   id: string;
@@ -89,6 +98,11 @@ export interface DbLog {
   logged_at: string; // ISO
   body: string | null;
   parent_log_id: string | null;
+  /** Set only on logs created via the starburst selector — the parent
+   *  base emotion the chosen emotion (or sub-emotion) sits under.
+   *  Classic logs and `'numb'` selections keep this NULL. Migration
+   *  0010. Drives the 6-lane visualization variant. */
+  base_emotion: BaseEmotion | null;
   /** Thread topic — set only on the root row of a thread (the log with
    *  parent_log_id = NULL that has at least one child). NULL on
    *  standalone logs and on every child. The client denormalizes this
@@ -317,6 +331,23 @@ export async function updateReminderSettings(
   return data as DbProfile;
 }
 
+/** Persist the user's selector-variant choice. Returns the refreshed
+ *  profile so callers can mirror it into in-memory auth state. */
+export async function updateEmotionUi(
+  userId: string,
+  emotionUi: EmotionUi,
+): Promise<DbProfile> {
+  const sb = requireClient();
+  const { data, error } = await sb
+    .from('profiles')
+    .update({ emotion_ui: emotionUi })
+    .eq('id', userId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbProfile;
+}
+
 /** True if the current Supabase user already has a Google identity
  *  linked. Used by AccountScreen to decide whether to show the "Link
  *  Google account" CTA or the static "linked" label. */
@@ -398,6 +429,9 @@ export interface NewLogInput {
    *  Required at the type level so callers think about it; falls back
    *  to 'speak' if a caller forgets (DB has the same default). */
   source?: 'speak' | 'type' | 'select' | 'quick';
+  /** Base emotion (starburst mode only). Classic-flow callers leave
+   *  this undefined and the column stays NULL. */
+  baseEmotion?: BaseEmotion | null;
   chips: { text: string; quadrant: Quadrant | null }[];
 }
 
@@ -421,6 +455,7 @@ export async function insertLog(input: NewLogInput): Promise<LogWithChips> {
       parent_log_id: input.parentLogId ?? null,
       topic: input.topic ?? null,
       source: input.source ?? 'speak',
+      base_emotion: input.baseEmotion ?? null,
     })
     .select()
     .single();
@@ -475,6 +510,7 @@ export function dbLogToLogEntry(db: LogWithChips): LogEntry {
     mode: db.mode,
     keywords: db.chips.map((c) => c.text),
     quadrants,
+    baseEmotion: db.base_emotion,
     body: db.body ?? undefined,
     chips: db.chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
     parentLogId: db.parent_log_id,

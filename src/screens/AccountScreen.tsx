@@ -5,9 +5,11 @@ import {
   linkGoogleIdentity,
   signOut,
   supabase,
+  updateEmotionUi,
   updateName,
   updateReminderSettings,
   type DbProfile,
+  type EmotionUi,
 } from '../lib/supabase';
 
 interface Props {
@@ -81,6 +83,25 @@ export default function AccountScreen({
     profile.reminder_time_2.slice(0, 5),
   );
   const [reminderError, setReminderError] = useState<string | null>(null);
+
+  // ── Emotion-selector variant. Optimistic — flip locally then persist.
+  //    On error we revert and surface the message inline.
+  const [emotionUi, setEmotionUiLocal] = useState<EmotionUi>(profile.emotion_ui);
+  const [emotionUiError, setEmotionUiError] = useState<string | null>(null);
+
+  async function onEmotionUiChange(next: EmotionUi) {
+    if (next === emotionUi) return;
+    const prev = emotionUi;
+    setEmotionUiLocal(next);
+    setEmotionUiError(null);
+    try {
+      const refreshed = await updateEmotionUi(profile.id, next);
+      onProfileUpdated(refreshed);
+    } catch (err) {
+      setEmotionUiLocal(prev);
+      setEmotionUiError(err instanceof Error ? err.message : String(err));
+    }
+  }
   // One debounce timer per picker, so stage-1 and stage-2 saves don't
   // cancel each other when the user adjusts them in quick succession.
   const reminderTimeoutRef = useRef<number | null>(null);
@@ -370,6 +391,46 @@ export default function AccountScreen({
               Stage 2's whole block is conditionally rendered: when
               stage 1 is off, stage 2 doesn't show at all. */}
         <hr className="acct-divider" />
+
+        {/* ── Emotion categories — selector variant toggle (migration
+              0010). 'By intensity' = classic quadrant grid, 'By type' =
+              starburst 6-base radial. Saves to profiles.emotion_ui on
+              tap and updates the visualization lanes globally. */}
+        <section className="acct-section">
+          <span className="acct-label">Emotion categories</span>
+          <div
+            className="acct-segmented"
+            role="radiogroup"
+            aria-label="Emotion categories"
+          >
+            <button
+              type="button"
+              role="radio"
+              aria-checked={emotionUi === 'classic'}
+              className={
+                'acct-segmented__opt' +
+                (emotionUi === 'classic' ? ' acct-segmented__opt--on' : '')
+              }
+              onClick={() => void onEmotionUiChange('classic')}
+            >
+              By intensity
+            </button>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={emotionUi === 'starburst'}
+              className={
+                'acct-segmented__opt' +
+                (emotionUi === 'starburst' ? ' acct-segmented__opt--on' : '')
+              }
+              onClick={() => void onEmotionUiChange('starburst')}
+            >
+              By type
+            </button>
+          </div>
+          {emotionUiError && <p className="acct-error">{emotionUiError}</p>}
+        </section>
+
         <section className="acct-section acct-section--terminal acct-reminders">
           <h2 className="acct-reminders__title">Daily reminder</h2>
 

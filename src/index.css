@@ -48,6 +48,91 @@
 
   --font-serif: 'Merriweather', Georgia, serif;
   --font-sans: 'Montserrat', system-ui, sans-serif;
+
+  /* ─────────── Starburst per-emotion palettes (Emotion Selector v2) ──
+     Six named palettes, one per base emotion. Primary shade is 400
+     except Lilac Bush (Love) which uses 500 — 400 reads too light
+     next to the other five. Source: TENOR_CONTEXT.md → Color Palettes
+     → Starburst variant. Used by StarburstSelectorScreen chips, the
+     6-lane chart variant, and any new starburst-mode surfaces. */
+
+  /* Feijoa — Surprise */
+  --feijoa-50:  #f4f9ec;
+  --feijoa-100: #e5f0d7;
+  --feijoa-200: #cde3b3;
+  --feijoa-300: #a9ce80;
+  --feijoa-400: #8fbc5f;
+  --feijoa-500: #71a141;
+  --feijoa-600: #567f31;
+  --feijoa-700: #436229;
+  --feijoa-800: #384f25;
+  --feijoa-900: #314423;
+  --feijoa-950: #17240f;
+
+  /* Ripe Lemon — Joy */
+  --ripe-lemon-50:  #fdfee8;
+  --ripe-lemon-100: #fdffc2;
+  --ripe-lemon-200: #ffff88;
+  --ripe-lemon-300: #fff844;
+  --ripe-lemon-400: #feeb11;
+  --ripe-lemon-500: #fbdd04;
+  --ripe-lemon-600: #cea500;
+  --ripe-lemon-700: #a47604;
+  --ripe-lemon-800: #875c0c;
+  --ripe-lemon-900: #734b10;
+  --ripe-lemon-950: #432705;
+
+  /* Lilac Bush — Love (primary = 500) */
+  --lilac-bush-50:  #f7f5fd;
+  --lilac-bush-100: #f0ecfb;
+  --lilac-bush-200: #e4dcf8;
+  --lilac-bush-300: #d0c1f1;
+  --lilac-bush-400: #b79de8;
+  --lilac-bush-500: #a178de;
+  --lilac-bush-600: #8f57d0;
+  --lilac-bush-700: #7f44bd;
+  --lilac-bush-800: #6a399e;
+  --lilac-bush-900: #583082;
+  --lilac-bush-950: #381e57;
+
+  /* Geraldine — Fear */
+  --geraldine-50:  #fef2f2;
+  --geraldine-100: #ffe1e2;
+  --geraldine-200: #ffc9ca;
+  --geraldine-300: #fea3a5;
+  --geraldine-400: #fc7679;
+  --geraldine-500: #f43f43;
+  --geraldine-600: #e12125;
+  --geraldine-700: #bd181c;
+  --geraldine-800: #9d171a;
+  --geraldine-900: #821a1c;
+  --geraldine-950: #470809;
+
+  /* Hit Pink — Anger */
+  --hit-pink-50:  #fff4ed;
+  --hit-pink-100: #ffe6d5;
+  --hit-pink-200: #fec8aa;
+  --hit-pink-300: #fda477;
+  --hit-pink-400: #fb713c;
+  --hit-pink-500: #f94b16;
+  --hit-pink-600: #ea310c;
+  --hit-pink-700: #c2210c;
+  --hit-pink-800: #9a1c12;
+  --hit-pink-900: #7c1a12;
+  --hit-pink-950: #430907;
+
+  /* Picton Blue — Sadness */
+  --picton-blue-50:  #f1f9fe;
+  --picton-blue-100: #e3f1fb;
+  --picton-blue-200: #c0e3f7;
+  --picton-blue-300: #89cdf0;
+  --picton-blue-400: #51b7e7;
+  --picton-blue-500: #229bd5;
+  --picton-blue-600: #147cb5;
+  --picton-blue-700: #126392;
+  --picton-blue-800: #135479;
+  --picton-blue-900: #154765;
+  --picton-blue-950: #0e2d43;
 }
 
 * {
@@ -1629,6 +1714,70 @@ button {
 }
 
 /* ════════════════════════════════════════════
+   Starburst selector — overrides on .eg-* primitives
+   ════════════════════════════════════════════ */
+/* Breadcrumb pill — top-centre, only renders when a base is bloomed.
+   Same visual weight as the .pnav__label (Logs period label) and the
+   .acct-label uppercase chip — keeps the breadcrumb feeling like a
+   navigational label rather than a button. */
+.sb-breadcrumb {
+  position: absolute;
+  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface-solid);
+  border: 1px solid rgba(34, 34, 34, 0.08);
+  border-radius: var(--r-pill);
+  padding: 6px 14px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  pointer-events: auto;
+}
+.sb-breadcrumb:active { transform: translateX(-50%) scale(0.97); }
+
+/* Sub chips are slightly smaller so the layer-2 density still reads.
+   Width / height set inline in chipStyle() so we can vary by kind. */
+.sb-chip {
+  /* Inherits everything from .eg-chip; the per-kind size override
+     comes from inline style. Nothing else needs adjusting. */
+}
+
+/* The "Select / Go deeper" action row that lives between the def card
+   and the next button when a base or sub is centred. */
+.sb-footer {
+  /* Make room for two extra rows (action buttons + next CTA) without
+     pushing the def card off the bottom mask. */
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 24px));
+}
+.sb-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  max-width: 320px;
+}
+.sb-actions--single {
+  grid-template-columns: 1fr;
+}
+.sb-actions__select,
+.sb-actions__deeper {
+  width: 100%;
+  justify-content: center;
+}
+.sb-def__word--numb {
+  background: var(--n-200);
+}
+
+/* ════════════════════════════════════════════
    Emotion review — selected list + context
    ════════════════════════════════════════════ */
 .er-body {
@@ -2857,6 +3006,44 @@ button {
 .acct-section.acct-section--terminal {
   margin-bottom: 0;
 }
+/* Segmented pill toggle used by the Emotion-categories section.
+   Same visual language as the Logs D/W/M/Y toggle (.dwmy) — solid
+   white pill, active option gets the same grey wash. Two equal-width
+   options. Tab/Enter activates each option (radio pattern). */
+.acct-segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  background: var(--surface-solid);
+  border: 1px solid rgba(34, 34, 34, 0.06);
+  border-radius: var(--r-pill);
+  padding: 4px;
+  box-shadow: 0 2px 6px rgba(34, 34, 34, 0.04);
+}
+.acct-segmented__opt {
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  border-radius: var(--r-pill);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--charcoal);
+  opacity: 0.55;
+  cursor: pointer;
+  transition: background 0.18s, opacity 0.18s;
+}
+.acct-segmented__opt--on {
+  background: rgba(34, 34, 34, 0.08);
+  opacity: 1;
+}
+.acct-segmented__opt:focus-visible {
+  outline: 2px solid var(--charcoal);
+  outline-offset: 2px;
+}
+
 /* Divider between the Sign Out CTA and any sections that sit below
    it on the Account screen. */
 .acct-divider {

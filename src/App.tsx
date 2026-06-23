@@ -7,6 +7,7 @@ import HomeScreen from './screens/HomeScreen';
 import LogMethodScreen from './screens/LogMethodScreen';
 import VoiceScreen from './screens/VoiceScreen';
 import EmotionGridScreen from './screens/EmotionGridScreen';
+import StarburstSelectorScreen from './screens/StarburstSelectorScreen';
 import EmotionReviewScreen from './screens/EmotionReviewScreen';
 import LogDetailScreen from './screens/LogDetailScreen';
 import LogsScreen from './screens/LogsScreen';
@@ -382,6 +383,14 @@ export default function App() {
   const [emotionSelected, setEmotionSelected] = useState<EmotionSelection[]>([]);
   const [emotionContext, setEmotionContext] = useState('');
 
+  // Which selector variant to mount when the user picks "I'll pick from
+  // emotions" — driven by profiles.emotion_ui. Guests have no profile
+  // (and no DB write path), so they always see classic.
+  const emotionUiVariant: 'classic' | 'starburst' =
+    auth.state.status === 'authenticated'
+      ? auth.state.profile.emotion_ui
+      : 'classic';
+
   async function submitVoiceLog(chips: Detected[], transcript: string) {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -484,6 +493,12 @@ export default function App() {
     const parentLogId = pendingParentLogId;
     setPendingParentLogId(null);
 
+    // Starburst log row carries a single `base_emotion`. With multi-
+    // select, the first chip's base wins — it's the lane the entry
+    // lives on for the 6-lane visualisation. NULL when not in
+    // starburst mode or when the user picked the centre "numb" chip.
+    const logBaseEmotion = emotionSelected.find((s) => s.baseEmotion)?.baseEmotion ?? null;
+
     if (auth.state.status === 'authenticated') {
       try {
         const result = await insertLog({
@@ -492,6 +507,7 @@ export default function App() {
           dateKey: TODAY_KEY,
           body: emotionContext.trim() || null,
           parentLogId: parentLogId ?? null,
+          baseEmotion: logBaseEmotion,
           chips: emotionSelected.map((s) => ({
             text: s.name,
             quadrant: s.quadrant,
@@ -515,6 +531,7 @@ export default function App() {
       source: 'select',
       keywords: emotionSelected.map((s) => s.name),
       quadrants,
+      baseEmotion: logBaseEmotion,
       body: emotionContext.trim() || undefined,
       chips: emotionSelected.map((s) => ({ text: s.name, quadrant: s.quadrant })),
       parentLogId: parentLogId ?? null,
@@ -791,7 +808,20 @@ export default function App() {
         />
       )}
 
-      {screen === 'emotionGrid' && (
+      {screen === 'emotionGrid' && emotionUiVariant === 'starburst' && (
+        <StarburstSelectorScreen
+          selected={emotionSelected}
+          onToggle={toggleEmotion}
+          onBack={() => {
+            // Starburst skips the classic quadrant picker — go back
+            // to the method picker so the user can switch input mode.
+            setLmInitialSection('methods');
+            setScreen('logMethod');
+          }}
+          onNext={() => setScreen('emotionReview')}
+        />
+      )}
+      {screen === 'emotionGrid' && emotionUiVariant !== 'starburst' && (
         <EmotionGridScreen
           entryQuadrant={entryQuadrant}
           selected={emotionSelected}
@@ -851,6 +881,7 @@ export default function App() {
       {screen === 'logs' && (
         <LogsScreen
           logs={logs}
+          emotionUi={emotionUiVariant}
           onOpenLog={(id) => openLogFromCard(id, 'logs')}
         />
       )}
