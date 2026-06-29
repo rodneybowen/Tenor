@@ -1,18 +1,27 @@
 // StarburstSelectorScreen — Emotion Selector v2 (variant: 'starburst')
 // =====================================================================
-// Shows the 6 Junto base emotions arranged radially on the same pannable
-// fisheye plane that EmotionGridScreen uses, with a centre "numb" chip.
-// Tapping a base emotion surfaces a definition card with two actions:
-// pick the base outright, or "Go deeper →" to bloom its sub-emotions
-// outward on the same plane. Sub-emotion picks auto-deselect the parent.
-// Selection cap is 5 (same as classic).
+// Sketched starburst plane:
+//   - "Numb" chip at the centre (0,0). Larger than the base chips, tap
+//      to select.
+//   - 6 base emotion chips at 60° increments, radius 220px from centre.
+//      Tap to select.
+//   - Each non-bloomed base owns a cluster: chip + a dotted line
+//      extending ~100px outward + "Get more specific?" text + "Yes,
+//      let's get specific" pill. The whole cluster is a single fisheye
+//      transform target — chip, line, and affordance scale and move
+//      together as the user pans (per Fix 2, Jun 29 2026).
+//   - Tapping "Yes, let's get specific" blooms that base — sub-emotions
+//      appear around its coordinates at radius 180px, fanned outward at
+//      equal angles. Only one base expanded at a time.
 //
-// What's shared with EmotionGridScreen — the viewport pan / scroll-pad
-// logic, the rAF fisheye transform loop, snap haptics, the click-vs-
-// drag suppression, and chip aesthetics. What's different — chip
-// placement (polar instead of 4-quadrant grid), per-base palettes
-// (CSS-variable lookup via baseEmotionColor), and the two-layer model
-// with bloom + breadcrumb + dual-action definition card.
+// Shared with EmotionGridScreen — viewport pan, scroll-pad, the rAF
+// fisheye transform loop, snap haptics, click-vs-drag suppression, chip
+// aesthetics, and footer "next" CTA.
+//
+// CRITICAL RULE: when emotion_ui === 'starburst' the strings HEP / HEN
+// / LEP / LEN must never appear in the UI. None of this screen renders
+// those — base + sub chips display lowercase emotion names, title-cased
+// at render.
 
 import {
   useEffect,
@@ -27,7 +36,6 @@ import { ArrowLeft, CaretRight } from '@phosphor-icons/react';
 import BackButton from '../components/BackButton';
 import {
   BASE_TO_QUADRANT,
-  EMOTION_DEFINITIONS,
   STARBURST_BASES,
   STARBURST_SUB_EMOTIONS,
   baseEmotionColor,
@@ -45,53 +53,65 @@ interface Props {
 }
 
 // — Geometry —————————————————————————————————————————————————
-// Layer 1 sits at radius 200px from centre (the "numb" chip is at 0,0);
-// layer 2 blooms outward in concentric arcs starting at radius 320px,
-// each ring 140px farther out. Each base owns a 60° wedge of the circle,
-// so a base's sub-emotions stay within ±30° of the base's angle. With
-// up to 22 sub-emotions per base, we pack 3 per ring so the chips don't
-// overlap — fisheye + pan takes care of close-quarters legibility.
-const CHIP = 130;
-const BASE_RADIUS = 200;
-const SUB_RING_START = 320;
-const SUB_RING_GAP = 140;
-const SUB_PER_RING = 3;
-const WEDGE_DEG = 60;
+// Chip sizes are intrinsic; the fisheye scale grows the centred chip
+// to ~60% of viewport width per spec (Fix 1, Jun 29 2026). Base chips
+// sit at BASE_RADIUS, sub chips at SUB_RADIUS from their PARENT (NOT
+// from centre, per spec).
+const NUMB_CHIP = 138; // larger than base chips
+const BASE_CHIP = 116;
+const SUB_CHIP = 96;
+const BASE_RADIUS = 220;
+const SUB_RADIUS = 180;
 
-// Scroll-pad so any chip can be panned to viewport centre and grown by
-// the fisheye. Biggest sub-emotion list (Sadness, 22) → 8 rings → max
-// radius ≈ 320 + 7×140 = 1300. Add ~400 of slack each side.
-const PLANE_HALF = 1300 + 400;
+// Affordance — dotted line + badge — lives inside each base cluster.
+// Offsets are relative to the chip centre in pre-scale coordinates.
+// STUB_LEN trimmed to 80 so when the chip is fisheye-magnified at
+// viewport centre, the badge still fits inside the screen mask.
+const STUB_LEN = 80;
+const STUB_START = BASE_CHIP / 2 + 2;
+const STUB_END = STUB_START + STUB_LEN;
+const BADGE_OFFSET = STUB_END + 12;
+
+// Sub-emotion bloom fan. Smaller fans for short sub lists keep them
+// tight under the parent; longer lists (Sadness = 22) open up to a
+// half-circle so chips don't all collapse onto each other.
+const MIN_FAN_DEG = 70;
+const MAX_FAN_DEG = 180;
+
+// Scroll-pad so the outermost chip can be panned to viewport centre.
+const PLANE_HALF = BASE_RADIUS + SUB_RADIUS + 600;
 const PLANE_W = PLANE_HALF * 2;
 const PLANE_H = PLANE_HALF * 2;
 const CENTER_X = PLANE_HALF;
 const CENTER_Y = PLANE_HALF;
 
-// — Fisheye tuning — matches EmotionGridScreen so motion feels familiar.
+// — Fisheye tuning ———————————————————————————————————————————
+// Same linear-interpolation formula as EmotionGridScreen. SCALE_CEIL
+// raised so the centred base chip fills ~55–65% of a typical 375–400px
+// viewport per Fix 1 spec (Jun 29 2026): 116px chip * 1.75 ≈ 203px on
+// a 375px viewport (54%); 138px numb chip * 1.75 ≈ 241px (64%).
+// FISHEYE_RADIUS and SCALE_FLOOR match classic for the same off-centre
+// roll-off feel.
 const FISHEYE_RADIUS = 240;
-const SCALE_CEIL = 1.08;
+const SCALE_CEIL = 1.75;
 const SCALE_FLOOR = 0.6;
 const OPACITY_FLOOR = 0.42;
 
-// Title-case "awe-struck" → "Awe-Struck", "numb" → "Numb". Sub-emotions
-// are stored lowercase to match the DB enum convention; we title-case
-// for display only.
 function titleCase(s: string): string {
   return s.replace(/(^|[\s-])(\w)/g, (_, p, c) => p + c.toUpperCase());
 }
 
 interface ChipPos {
-  /** Layer-1 chips use 'base' or 'numb'; layer-2 chips use 'sub'. */
-  kind: 'numb' | 'base' | 'sub';
+  kind: 'numb' | 'sub';
   /** Lowercase emotion identifier — what gets logged as emotion_name. */
   name: string;
-  /** The starburst base this chip belongs to. NULL only for 'numb'. */
+  /** Starburst base this chip belongs to. NULL only for 'numb'. */
   base: BaseEmotion | null;
   cx: number;
   cy: number;
 }
 
-/** Polar → Cartesian on the plane, with 0° pointing north (top). */
+/** Polar → Cartesian on the plane, 0° = north (top). */
 function polarXY(angleDeg: number, radius: number) {
   const rad = ((angleDeg - 90) * Math.PI) / 180;
   return {
@@ -102,29 +122,52 @@ function polarXY(angleDeg: number, radius: number) {
 
 const BASES = Object.keys(STARBURST_BASES) as BaseEmotion[];
 
-function buildLayer1(): ChipPos[] {
-  const numb: ChipPos = { kind: 'numb', name: 'numb', base: null, cx: CENTER_X, cy: CENTER_Y };
-  const bases: ChipPos[] = BASES.map((b) => {
-    const { x, y } = polarXY(STARBURST_BASES[b].angle, BASE_RADIUS);
-    return { kind: 'base', name: b, base: b, cx: x, cy: y };
-  });
-  return [numb, ...bases];
+interface BasePos {
+  base: BaseEmotion;
+  cx: number;
+  cy: number;
+  /** Outward unit vector (from centre, normalized). */
+  ux: number;
+  uy: number;
+  angle: number;
 }
 
+const BASE_POSITIONS: Record<BaseEmotion, BasePos> = (() => {
+  const out = {} as Record<BaseEmotion, BasePos>;
+  for (const b of BASES) {
+    const angle = STARBURST_BASES[b].angle;
+    const { x, y } = polarXY(angle, BASE_RADIUS);
+    const dx = x - CENTER_X;
+    const dy = y - CENTER_Y;
+    const len = Math.hypot(dx, dy) || 1;
+    out[b] = { base: b, cx: x, cy: y, ux: dx / len, uy: dy / len, angle };
+  }
+  return out;
+})();
+
+const NUMB_POS: ChipPos = {
+  kind: 'numb', name: 'numb', base: null, cx: CENTER_X, cy: CENTER_Y,
+};
+
+/** Bloom sub-emotions around a base — radius SUB_RADIUS from the
+ *  parent, fanned at equal angles centred on the outward radial. */
 function buildBloom(base: BaseEmotion): ChipPos[] {
   const subs = STARBURST_SUB_EMOTIONS[base];
-  const baseAngle = STARBURST_BASES[base].angle;
+  const { cx, cy, angle } = BASE_POSITIONS[base];
+  const n = subs.length;
+  if (n === 0) return [];
+  const fan = Math.min(MAX_FAN_DEG, Math.max(MIN_FAN_DEG, (n - 1) * 16));
   return subs.map((name, i) => {
-    const ringIdx = Math.floor(i / SUB_PER_RING);
-    const inRing = i % SUB_PER_RING;
-    const r = SUB_RING_START + ringIdx * SUB_RING_GAP;
-    // Spread `SUB_PER_RING` chips evenly across the wedge, leaving a
-    // half-step margin at each edge so the wedges of adjacent bases
-    // don't visually fight at the seams.
-    const step = WEDGE_DEG / SUB_PER_RING;
-    const angle = baseAngle - WEDGE_DEG / 2 + step * (inRing + 0.5);
-    const { x, y } = polarXY(angle, r);
-    return { kind: 'sub', name, base, cx: x, cy: y };
+    const t = n === 1 ? 0.5 : i / (n - 1);
+    const subAngle = angle - fan / 2 + t * fan;
+    const rad = ((subAngle - 90) * Math.PI) / 180;
+    return {
+      kind: 'sub',
+      name,
+      base,
+      cx: cx + SUB_RADIUS * Math.cos(rad),
+      cy: cy + SUB_RADIUS * Math.sin(rad),
+    };
   });
 }
 
@@ -136,27 +179,37 @@ export default function StarburstSelectorScreen({
   max = 5,
 }: Props) {
   const viewportRef = useRef<HTMLDivElement>(null);
-  const chipRefs = useRef(new Map<string, HTMLButtonElement>());
+  // fisheyeRefs holds every element that needs the scale/opacity
+  // transform. Keyed by 'numb' / base name / sub name. For numb +
+  // subs the element is the chip button; for bases the element is
+  // the cluster wrapper (chip + affordance scale together).
+  const fisheyeRefs = useRef(new Map<string, HTMLElement>());
   const rafRef = useRef<number | null>(null);
 
-  // Which base emotion is currently "bloomed" (showing sub-emotions).
-  // null = layer 1 only. Tapping "Go deeper" sets this; the back arrow
-  // / breadcrumb back-tap clears it.
   const [bloomedBase, setBloomedBase] = useState<BaseEmotion | null>(null);
 
-  const positions = useMemo<ChipPos[]>(() => {
-    const layer1 = buildLayer1();
-    if (!bloomedBase) return layer1;
-    return [...layer1, ...buildBloom(bloomedBase)];
-  }, [bloomedBase]);
+  const subChips = useMemo<ChipPos[]>(
+    () => (bloomedBase ? buildBloom(bloomedBase) : []),
+    [bloomedBase],
+  );
 
-  const initialCentered = positions.find((p) => p.kind === 'numb') ?? positions[0];
-  const centeredRef = useRef<string>(initialCentered.name);
-  const [centered, setCentered] = useState<ChipPos>(initialCentered);
+  // All fisheye-managed positions, including cluster wrappers (base
+  // chips) so the centre-finding code knows about them.
+  const fisheyeTargets = useMemo(() => {
+    const list: { key: string; cx: number; cy: number }[] = [
+      { key: 'numb', cx: NUMB_POS.cx, cy: NUMB_POS.cy },
+    ];
+    for (const b of BASES) {
+      list.push({ key: b, cx: BASE_POSITIONS[b].cx, cy: BASE_POSITIONS[b].cy });
+    }
+    for (const s of subChips) {
+      list.push({ key: s.name, cx: s.cx, cy: s.cy });
+    }
+    return list;
+  }, [subChips]);
 
-  // — Mouse-drag pan (touch uses native overflow scrolling) — copied
-  //   verbatim from EmotionGridScreen so the gesture feels identical
-  //   across the two variants.
+  // — Mouse-drag pan (touch uses native overflow scrolling). Copied
+  //   from EmotionGridScreen.
   const dragRef = useRef<{
     sx: number; sy: number; sLeft: number; sTop: number; moved: boolean;
   } | null>(null);
@@ -169,10 +222,8 @@ export default function StarburstSelectorScreen({
     const vp = viewportRef.current;
     if (!vp) return;
     dragRef.current = {
-      sx: e.clientX,
-      sy: e.clientY,
-      sLeft: vp.scrollLeft,
-      sTop: vp.scrollTop,
+      sx: e.clientX, sy: e.clientY,
+      sLeft: vp.scrollLeft, sTop: vp.scrollTop,
       moved: false,
     };
   }
@@ -189,7 +240,7 @@ export default function StarburstSelectorScreen({
         vp.setPointerCapture(e.pointerId);
         capturedPointerRef.current = e.pointerId;
       } catch {
-        // ignore — pointer already gone
+        // ignore
       }
     }
     if (drag.moved) {
@@ -230,73 +281,39 @@ export default function StarburstSelectorScreen({
   );
   const capReached = selected.length >= max;
 
-  // Fisheye: same model as the classic grid. We also use it to pick
-  // the chip nearest viewport centre — that's the chip the definition
-  // card describes.
+  // Apply fisheye scale/opacity to every registered target each rAF.
   function applyFisheye() {
     const vp = viewportRef.current;
     if (!vp) return;
     const vcx = vp.scrollLeft + vp.clientWidth / 2;
     const vcy = vp.scrollTop + vp.clientHeight / 2;
-    let nearest: ChipPos | null = null;
-    let nearestDist = Infinity;
-    chipRefs.current.forEach((el, key) => {
-      const pos = positions.find((p) => p.name === key);
-      if (!pos) return;
-      const dist = Math.hypot(pos.cx - vcx, pos.cy - vcy);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        nearest = pos;
-      }
+    fisheyeRefs.current.forEach((el, key) => {
+      const target = fisheyeTargets.find((t) => t.key === key);
+      if (!target) return;
+      const dist = Math.hypot(target.cx - vcx, target.cy - vcy);
       const t = Math.min(1, dist / FISHEYE_RADIUS);
       const scale = SCALE_CEIL - (SCALE_CEIL - SCALE_FLOOR) * t;
       const opacity = 1 - (1 - OPACITY_FLOOR) * t;
       el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
       el.style.opacity = opacity.toFixed(3);
     });
-    if (nearest && (nearest as ChipPos).name !== centeredRef.current) {
-      centeredRef.current = (nearest as ChipPos).name;
-      setCentered(nearest);
-    }
   }
 
-  // Prime Taptic on mount so the first scroll tick isn't silent.
   useEffect(() => {
     haptics.prime();
   }, []);
 
-  // Centre on the "numb" chip on mount, and re-centre on the bloomed
-  // base when the user drills in — keeps the just-selected base in
-  // view as the sub-emotions appear around it.
-  const userInteractedRef = useRef(false);
+  // Centre on "numb" on mount, and re-centre on the bloomed base when
+  // the user drills in.
   useEffect(() => {
     const vp = viewportRef.current;
     if (!vp) return;
-    function markInteracted() {
-      userInteractedRef.current = true;
-    }
-    vp.addEventListener('pointerdown', markInteracted, { once: true });
-    vp.addEventListener('wheel', markInteracted, { once: true, passive: true });
-    vp.addEventListener('touchstart', markInteracted, { once: true, passive: true });
-    return () => {
-      vp.removeEventListener('pointerdown', markInteracted);
-      vp.removeEventListener('wheel', markInteracted);
-      vp.removeEventListener('touchstart', markInteracted);
-    };
-  }, []);
-
-  useEffect(() => {
-    const vp = viewportRef.current;
-    if (!vp) return;
-    // Reset the interaction lock when bloom state flips so the
-    // re-centre below actually fires.
-    userInteractedRef.current = false;
     const target = bloomedBase
-      ? positions.find((p) => p.kind === 'base' && p.name === bloomedBase) ?? positions[0]
-      : positions.find((p) => p.kind === 'numb') ?? positions[0];
+      ? BASE_POSITIONS[bloomedBase]
+      : { cx: CENTER_X, cy: CENTER_Y };
     vp.scrollLeft = target.cx - vp.clientWidth / 2;
     vp.scrollTop = target.cy - vp.clientHeight / 2;
-  }, [bloomedBase, positions]);
+  }, [bloomedBase]);
 
   useEffect(() => {
     const vp = viewportRef.current;
@@ -316,11 +333,11 @@ export default function StarburstSelectorScreen({
         const vcy = v.scrollTop + v.clientHeight / 2;
         let nearestKey: string | null = null;
         let nearestDist = Infinity;
-        for (const p of positions) {
+        for (const p of fisheyeTargets) {
           const d = Math.hypot(p.cx - vcx, p.cy - vcy);
           if (d < nearestDist) {
             nearestDist = d;
-            nearestKey = p.name;
+            nearestKey = p.key;
           }
         }
         if (nearestKey && nearestKey !== lastCenteredKey) {
@@ -335,7 +352,7 @@ export default function StarburstSelectorScreen({
       const vcx = v.scrollLeft + v.clientWidth / 2;
       const vcy = v.scrollTop + v.clientHeight / 2;
       let nearest = Infinity;
-      for (const p of positions) {
+      for (const p of fisheyeTargets) {
         const d = Math.hypot(p.cx - vcx, p.cy - vcy);
         if (d < nearest) nearest = d;
       }
@@ -348,40 +365,49 @@ export default function StarburstSelectorScreen({
       vp.removeEventListener('scrollend', onScrollEnd);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [positions]);
+  }, [fisheyeTargets]);
 
-  // — Chip styling. 'numb' uses the neutral palette; base + sub chips
-  //   use the base's per-palette CSS variables. Selected = solid
-  //   primary; unselected = light tint (300/200) so multiple unselected
-  //   chips still differentiate by colour.
-  function chipStyle(chip: ChipPos, isSelected: boolean): CSSProperties {
-    if (chip.kind === 'numb') {
-      return {
-        background: isSelected ? 'var(--n-400)' : 'var(--n-200)',
-        borderColor: isSelected ? 'var(--n-700)' : 'transparent',
-        color: 'var(--charcoal)',
-      };
-    }
-    const b = chip.base!;
+  // — Chip styling ———————————————————————————————————————————
+  function numbStyle(isSelected: boolean): CSSProperties {
+    return {
+      background: 'var(--n-200)',
+      borderColor: isSelected ? 'var(--n-700)' : 'transparent',
+      color: 'var(--n-800)',
+      width: `${NUMB_CHIP}px`,
+      height: `${NUMB_CHIP}px`,
+    };
+  }
+  function baseChipStyle(b: BaseEmotion, isSelected: boolean): CSSProperties {
     const meta = STARBURST_BASES[b];
     return {
-      background: isSelected
-        ? baseEmotionColor(b)
-        : baseEmotionColor(b, meta.primaryShade === 500 ? 300 : 200),
+      background: baseEmotionColor(b),
       borderColor: isSelected
         ? baseEmotionColor(b, meta.primaryShade === 500 ? 700 : 600)
         : 'transparent',
-      color: 'var(--charcoal)',
-      // Layer-1 base chips are larger than sub chips per spec.
-      width: chip.kind === 'base' ? `${CHIP}px` : `${CHIP - 18}px`,
-      height: chip.kind === 'base' ? `${CHIP}px` : `${CHIP - 18}px`,
+      // Ripe Lemon needs neutral-900 text for legibility.
+      color: meta.palette === 'ripe-lemon' ? 'var(--n-900)' : 'var(--n-800)',
+      width: `${BASE_CHIP}px`,
+      height: `${BASE_CHIP}px`,
+    };
+  }
+  function subChipStyle(b: BaseEmotion, isSelected: boolean): CSSProperties {
+    const meta = STARBURST_BASES[b];
+    return {
+      background: baseEmotionColor(b, 100),
+      borderColor: isSelected
+        ? baseEmotionColor(b, 700)
+        : baseEmotionColor(b, 400),
+      color: meta.palette === 'ripe-lemon'
+        ? 'var(--n-900)'
+        : baseEmotionColor(b, 700),
+      width: `${SUB_CHIP}px`,
+      height: `${SUB_CHIP}px`,
+      fontSize: '14px',
     };
   }
 
-  // — Selection handlers. Base emotion picks (from the def card)
-  //   replace any sub-emotion of the same base in the current
-  //   selection — and vice versa — so the user can't have BOTH 'joy'
-  //   and 'excited' picked at once.
+  // — Selection handlers. Base picks replace any sub of the same base
+  //   (and vice versa) so the user can't have both "joy" and "excited".
   function pickBase(b: BaseEmotion) {
     const exists = selected.find((s) => s.name === b);
     if (exists) {
@@ -389,11 +415,8 @@ export default function StarburstSelectorScreen({
       onToggle({ name: b, quadrant: BASE_TO_QUADRANT[b], baseEmotion: b });
       return;
     }
-    // Remove any sub-emotion that belongs to this base before adding.
     for (const s of selected) {
-      if (s.baseEmotion === b && s.name !== b) {
-        onToggle(s); // toggle off
-      }
+      if (s.baseEmotion === b && s.name !== b) onToggle(s);
     }
     if (capReached) return;
     haptics.tap();
@@ -407,11 +430,8 @@ export default function StarburstSelectorScreen({
       onToggle({ name, quadrant: BASE_TO_QUADRANT[b], baseEmotion: b });
       return;
     }
-    // Auto-deselect the parent base if it's selected — spec rule.
     const parentSelected = selected.find((s) => s.name === b);
-    if (parentSelected) {
-      onToggle(parentSelected);
-    }
+    if (parentSelected) onToggle(parentSelected);
     if (capReached && !parentSelected) return;
     haptics.tap();
     onToggle({ name, quadrant: BASE_TO_QUADRANT[b], baseEmotion: b });
@@ -421,8 +441,6 @@ export default function StarburstSelectorScreen({
     const exists = selected.find((s) => s.name === 'numb');
     if (exists) {
       haptics.softTap();
-      // Use a placeholder quadrant for back-compat; numb's lane is
-      // independent (chips render with the neutral palette).
       onToggle({ name: 'numb', quadrant: 'len', baseEmotion: null });
       return;
     }
@@ -431,31 +449,190 @@ export default function StarburstSelectorScreen({
     onToggle({ name: 'numb', quadrant: 'len', baseEmotion: null });
   }
 
-  // Chip click — for layer-1 bases this just snap-centres (the def
-  // card surfaces Select / Go deeper actions). For 'numb' and sub
-  // chips the click directly toggles selection.
-  function onChipClick(chip: ChipPos) {
-    if (chip.kind === 'numb') {
-      pickNumb();
-      return;
-    }
-    if (chip.kind === 'sub') {
-      pickSub(chip.name, chip.base!);
-      return;
-    }
-    // Base chip: just bring it to centre so the def card pops up.
-    const vp = viewportRef.current;
-    if (vp) {
-      vp.scrollTo({
-        left: chip.cx - vp.clientWidth / 2,
-        top: chip.cy - vp.clientHeight / 2,
-        behavior: 'smooth',
-      });
-    }
+  function expandBase(b: BaseEmotion) {
+    haptics.tap();
+    setBloomedBase(b);
   }
 
   const left = max - selected.length;
-  const isSelected = selectedSet.has(centered.name);
+
+  // Global SVG layer — only renders the long-haul spokes (centre→base,
+  // and base→sub when bloomed). The per-base dotted stub now lives
+  // inside each cluster wrapper so it scales with the chip (Fix 2).
+  const renderGlobalLines = () => (
+    <svg
+      className="sb-lines"
+      width={PLANE_W}
+      height={PLANE_H}
+      aria-hidden="true"
+    >
+      {BASES.map((b) => {
+        const p = BASE_POSITIONS[b];
+        return (
+          <line
+            key={`spoke-${b}`}
+            x1={CENTER_X}
+            y1={CENTER_Y}
+            x2={p.cx}
+            y2={p.cy}
+            stroke="currentColor"
+            strokeWidth={1.2}
+            style={{ color: baseEmotionColor(b, 200) }}
+          />
+        );
+      })}
+      {bloomedBase &&
+        subChips.map((s) => {
+          const p = BASE_POSITIONS[bloomedBase];
+          return (
+            <line
+              key={`sub-spoke-${s.name}`}
+              x1={p.cx}
+              y1={p.cy}
+              x2={s.cx}
+              y2={s.cy}
+              stroke="currentColor"
+              strokeWidth={1.2}
+              style={{ color: baseEmotionColor(bloomedBase, 300) }}
+            />
+          );
+        })}
+    </svg>
+  );
+
+  // — Per-base cluster ————————————————————————————————————————
+  // Wrapper at the base's plane coord. Fisheye scales the wrapper, so
+  // the chip + dotted stub + badge all grow and shrink together as the
+  // user pans (per Fix 2). The chip stays the click target for
+  // selection; the affordance is hidden once that base is bloomed.
+  function renderBaseCluster(b: BaseEmotion) {
+    const meta = STARBURST_BASES[b];
+    const pos = BASE_POSITIONS[b];
+    const isSel = selectedSet.has(b);
+    const disabled = !isSel && capReached;
+    const isBloomed = bloomedBase === b;
+    // Anchors for the dotted stub + badge, in the cluster's local
+    // coordinate space (chip centre = (0, 0)).
+    const stubX1 = pos.ux * STUB_START;
+    const stubY1 = pos.uy * STUB_START;
+    const stubX2 = pos.ux * STUB_END;
+    const stubY2 = pos.uy * STUB_END;
+    const badgeX = pos.ux * BADGE_OFFSET;
+    const badgeY = pos.uy * BADGE_OFFSET;
+    // The SVG canvas inside the cluster spans ±SVG_R around the chip
+    // centre so the dotted stub fits regardless of outward direction.
+    const SVG_R = STUB_END + 4;
+
+    return (
+      <div
+        key={`cluster-${b}`}
+        className="sb-cluster"
+        ref={(el) => {
+          if (el) fisheyeRefs.current.set(b, el);
+          else fisheyeRefs.current.delete(b);
+        }}
+        style={{ left: pos.cx, top: pos.cy }}
+      >
+        <button
+          type="button"
+          className={
+            'eg-chip sb-chip sb-chip--base' +
+            (isSel ? ' eg-chip--on' : '') +
+            (disabled ? ' eg-chip--disabled' : '')
+          }
+          style={baseChipStyle(b, isSel)}
+          aria-pressed={isSel}
+          disabled={disabled}
+          onClick={() => pickBase(b)}
+        >
+          {meta.label}
+        </button>
+
+        {!isBloomed && (
+          <>
+            <svg
+              className="sb-cluster__stub"
+              width={SVG_R * 2}
+              height={SVG_R * 2}
+              style={{ left: -SVG_R, top: -SVG_R }}
+              aria-hidden="true"
+            >
+              <line
+                x1={SVG_R + stubX1}
+                y1={SVG_R + stubY1}
+                x2={SVG_R + stubX2}
+                y2={SVG_R + stubY2}
+                stroke="currentColor"
+                strokeWidth={1.2}
+                strokeDasharray="3 5"
+                strokeLinecap="round"
+                style={{ color: baseEmotionColor(b, 400) }}
+              />
+            </svg>
+            <div
+              className="sb-cluster__badge"
+              style={{ left: badgeX, top: badgeY }}
+            >
+              <span className="sb-cluster__hint">Get more specific?</span>
+              <button
+                type="button"
+                className="sb-cluster__btn"
+                onClick={() => expandBase(b)}
+                style={{
+                  background: baseEmotionColor(b, 100),
+                  color: baseEmotionColor(b, 700),
+                  borderColor: baseEmotionColor(b, 300),
+                }}
+              >
+                Yes, let&rsquo;s get specific
+                <CaretRight size={11} weight="bold" />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // — Numb + sub chips ————————————————————————————————————————
+  // Rendered as flat buttons (no cluster wrapper); fisheye scales the
+  // button directly.
+  function renderFlatChip(p: ChipPos) {
+    const isSel = selectedSet.has(p.name);
+    const label = titleCase(p.name);
+    const disabled = !isSel && capReached;
+    const style: CSSProperties = p.kind === 'numb'
+      ? numbStyle(isSel)
+      : subChipStyle(p.base!, isSel);
+    return (
+      <button
+        key={`${p.kind}:${p.name}`}
+        type="button"
+        ref={(el) => {
+          if (el) fisheyeRefs.current.set(p.name, el);
+          else fisheyeRefs.current.delete(p.name);
+        }}
+        className={
+          'eg-chip sb-chip sb-chip--' + p.kind +
+          (isSel ? ' eg-chip--on' : '') +
+          (disabled ? ' eg-chip--disabled' : '')
+        }
+        style={{
+          left: p.cx,
+          top: p.cy,
+          ...style,
+        }}
+        aria-pressed={isSel}
+        disabled={disabled}
+        onClick={() => {
+          if (p.kind === 'numb') pickNumb();
+          else pickSub(p.name, p.base!);
+        }}
+      >
+        {label}
+      </button>
+    );
+  }
 
   return (
     <div className="screen" id="starburst">
@@ -481,7 +658,7 @@ export default function StarburstSelectorScreen({
           type="button"
           className="sb-breadcrumb"
           onClick={() => setBloomedBase(null)}
-          aria-label={`Back to base emotions`}
+          aria-label="Back to base emotions"
         >
           <ArrowLeft size={14} weight="bold" />
           {STARBURST_BASES[bloomedBase].label}
@@ -504,122 +681,17 @@ export default function StarburstSelectorScreen({
           style={{ width: PLANE_W, height: PLANE_H }}
           role="group"
         >
-          {positions.map((p) => {
-            const isSel = selectedSet.has(p.name);
-            const label = titleCase(p.name);
-            const disabled = !isSel && capReached;
-            return (
-              <button
-                key={`${p.kind}:${p.name}`}
-                type="button"
-                ref={(el) => {
-                  if (el) chipRefs.current.set(p.name, el);
-                  else chipRefs.current.delete(p.name);
-                }}
-                className={
-                  'eg-chip sb-chip sb-chip--' + p.kind +
-                  (isSel ? ' eg-chip--on' : '') +
-                  (disabled ? ' eg-chip--disabled' : '')
-                }
-                style={{
-                  left: p.cx,
-                  top: p.cy,
-                  ...chipStyle(p, isSel),
-                }}
-                aria-pressed={isSel}
-                disabled={disabled}
-                onClick={() => onChipClick(p)}
-              >
-                {label}
-              </button>
-            );
-          })}
+          {renderGlobalLines()}
+
+          {renderFlatChip(NUMB_POS)}
+
+          {BASES.map((b) => renderBaseCluster(b))}
+
+          {subChips.map((s) => renderFlatChip(s))}
         </div>
       </div>
 
       <footer className="eg-footer sb-footer">
-        <div className="eg-def" aria-live="polite">
-          {centered.kind === 'numb' ? (
-            <>
-              <span className="eg-def__word sb-def__word--numb">
-                &ldquo;Numb&rdquo;
-              </span>
-              <p className="eg-def__body">
-                {EMOTION_DEFINITIONS.numb}
-              </p>
-            </>
-          ) : centered.kind === 'base' ? (
-            <>
-              <span
-                className="eg-def__word"
-                style={{
-                  background: baseEmotionColor(centered.base!, 200),
-                }}
-              >
-                &ldquo;{STARBURST_BASES[centered.base!].label}&rdquo;
-              </span>
-              <p className="eg-def__body">
-                {STARBURST_BASES[centered.base!].label} — select this, or
-                explore more specific feelings.
-              </p>
-            </>
-          ) : (
-            <>
-              <span
-                className="eg-def__word"
-                style={{
-                  background: baseEmotionColor(centered.base!, 200),
-                }}
-              >
-                &ldquo;{titleCase(centered.name)}&rdquo;
-              </span>
-              <p className="eg-def__body">
-                {EMOTION_DEFINITIONS[centered.name] ?? ''}
-              </p>
-            </>
-          )}
-        </div>
-
-        {/* Layer-1 base centred → dual-action row (Select + Go deeper).
-            Sub centred → single Select. 'numb' centred → no extra row
-            (the chip toggles directly). All paths still surface the
-            "next" button at the bottom of the footer. */}
-        {centered.kind === 'base' && (
-          <div className="sb-actions">
-            <button
-              type="button"
-              className="btn-secondary sb-actions__select"
-              onClick={() => pickBase(centered.base!)}
-              disabled={!isSelected && capReached}
-            >
-              {isSelected ? 'Selected' : `Select ${STARBURST_BASES[centered.base!].label}`}
-            </button>
-            <button
-              type="button"
-              className="btn-primary sb-actions__deeper"
-              onClick={() => {
-                haptics.tap();
-                setBloomedBase(centered.base!);
-              }}
-            >
-              Go deeper
-              <CaretRight size={14} weight="bold" />
-            </button>
-          </div>
-        )}
-        {centered.kind === 'sub' && (
-          <div className="sb-actions sb-actions--single">
-            <button
-              type="button"
-              className="btn-primary sb-actions__select"
-              onClick={() => pickSub(centered.name, centered.base!)}
-              disabled={!isSelected && capReached}
-            >
-              {isSelected ? 'Selected' : `Select ${titleCase(centered.name)}`}
-            </button>
-          </div>
-        )}
-
         <button
           type="button"
           className="btn-primary eg-next"

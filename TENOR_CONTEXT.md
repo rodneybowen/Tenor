@@ -646,21 +646,31 @@ No usage counters, no prompt-shown flag, no initial-choice tracking — delibera
 ### No one-time prompt
 There is no on-scroll prompt in `LogMethodScreen`. Variant is a settings toggle only (see AccountScreen toggle below). `LogMethodScreen` needs no changes for this feature.
 
-### Starburst layout
-- Same 2D pannable plane and fisheye as classic. Same pan gestures (touch, trackpad, mouse drag), same haptics, same selection cap (5 emotions), same chip aesthetics (gradient lit-sphere).
-- **Center chip — "numb":** a single neutral chip sits at the exact center of the plane (0, 0). Neutral palette (neutral-400 background). Selectable as a standalone emotion — logs `emotion_name = 'numb'`, `base_emotion = null`. Represents emotional numbness / inability to identify a feeling. Snap-centers like any other chip.
-- **Layer 1 — base emotions (initial view):** 6 chips arranged radially at **60° increments** around the center (radius ≈ 200px). Each chip uses its own per-emotion palette (see Color Palettes → Starburst). Chips are larger than classic (~130px) since there are fewer per view. **Sub-emotion chips are hidden until a base emotion is tapped.**
-  - Clockwise from top: **Surprise** (0°), **Joy** (60°), **Love** (120°), **Fear** (180°), **Anger** (240°), **Sadness** (300°)
-  - Palette mapping: Surprise → Feijoa, Joy → Ripe Lemon, Love → Lilac Bush (500), Fear → Geraldine, Anger → Hit Pink, Sadness → Picton Blue
-- **Definition card (base emotion):** appears when user snap-centers on a base emotion. Copy: *"[Emotion] — select this, or explore more specific feelings."* Two actions: **"Select [emotion]"** (proceeds to review) and **"Go deeper →"** (reveals sub-emotions).
-- **Layer 2 — sub-emotions (bloom on tap):** tapping "Go deeper" reveals sub-emotion chips blooming outward from the selected base emotion on the **same plane** (not a separate screen). They radiate at equal angular spacing from the base emotion's position. Breadcrumb at top updates: `Joy →`. Definition card shows sub-emotion name + definition; single action: **"Select [sub-emotion]"**. Back arrow or back gesture collapses sub-emotions back to layer 1.
-- **Breadcrumb:** top of screen, Montserrat Label, neutral-400. Updates live: blank at layer 1, `[Base] →` while in layer 2.
+### Starburst layout — coordinate system
+The starburst is a 2D plane inside the same fisheye panning system as the classic grid. **The full starburst is NEVER visible at once.** Fisheye rules are identical: centered chip is large; only directly adjacent/connected chips are partially visible at the edges. Users pan to navigate.
+
+- Same pan gestures (touch, trackpad, mouse drag), same haptics, same selection cap (5 emotions), same chip aesthetics (gradient lit-sphere).
+- **Connecting lines** are drawn between chips: numb → each of the 6 base emotions, and base emotion → each of its sub-emotions (when expanded). Thin strokes in the palette's light shade.
+- **Center chip — "numb":** at coordinates (0, 0). Neutral palette (neutral-200 background, neutral-700 text). Slightly larger chip — it's what fills the screen on load. No "get more specific" affordance. Tap to select → logs `emotion_name = 'numb'`, `base_emotion = null`.
+- **Base emotions:** 6 chips at 60° increments, radius ≈ 220px from center. Clockwise from top: **Surprise** (0°), **Joy** (60°), **Love** (120°), **Fear** (180°), **Anger** (240°), **Sadness** (300°). Palette mapping: Surprise → Feijoa, Joy → Ripe Lemon, Love → Lilac Bush (500), Fear → Geraldine, Anger → Hit Pink, Sadness → Picton Blue.
+- **Sub-emotions:** positioned radiating outward from their parent base emotion's coordinates (NOT from center), radius ≈ 180px from the base emotion chip. Equal angular spread fanning away from center. Sub-emotion chips use their parent's palette (lighter shade background, primary shade border/text). **Hidden by default.**
+
+### "Get more specific" affordance — dotted line + badge
+Each base emotion chip has a **dotted line** extending outward (away from center) to a small persistent badge that reads **"Get more specific?"** with a **"Yes, let's get specific"** tap target. This affordance is always present on every base emotion — it does not require a tap to appear; users see it as they pan near any base emotion chip.
+
+- **Tap "Yes, let's get specific":** Dotted line animates to a **solid line**. Badge disappears and sub-emotion chips bloom outward from that base emotion's position. Breadcrumb at top updates to `[Base] →` (e.g., `Fear →`), Montserrat Label, neutral-400.
+- **Ignore it:** User can pan freely or tap the base emotion chip to select it — sub-emotions never appear.
+- **One expansion at a time:** When user taps "Yes" on a different base emotion, the previously expanded one collapses (solid → dotted, sub-emotions disappear). Only one base emotion expanded simultaneously.
+- **"Numb" has no dotted line or badge** — tap-to-select only.
 
 ### Selection model
-- **Select base emotion:** logs `emotion_name = 'joy'`, `base_emotion = 'joy'`. No sub-emotion selected.
-- **Select sub-emotion:** auto-deselects the parent base emotion chip; logs `emotion_name = 'excited'`, `base_emotion = 'joy'`. The sub-emotion inherits the parent's palette for chip coloring.
-- **Select "numb":** logs `emotion_name = 'numb'`, `base_emotion = null`.
-- Multi-select cap of 5 applies across the starburst plane (same as classic).
+Nothing auto-selects. All selection requires an explicit tap on a chip.
+
+- **Tap base emotion chip:** logs `emotion_name = 'fear'`, `base_emotion = 'fear'`. Works whether or not sub-emotions are expanded.
+- **Tap sub-emotion chip:** logs `emotion_name = 'scared'`, `base_emotion = 'fear'`. Sub-emotion inherits parent palette for chip coloring.
+- **Tap "numb":** logs `emotion_name = 'numb'`, `base_emotion = null`.
+- Multi-select cap of 5 applies across the whole starburst plane (same as classic).
+- **Breadcrumb:** blank at rest; `[Base] →` when a base emotion is expanded; clears when expansion collapses.
 
 ### Data model — logs table (migration `0010_emotion_ui.sql`)
 Starburst mode requires two new columns on `public.logs`:

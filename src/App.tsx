@@ -385,9 +385,19 @@ export default function App() {
 
   // Which selector variant to mount when the user picks "I'll pick from
   // emotions" — driven by profiles.emotion_ui. Guests have no profile
-  // (and no DB write path), so they always see classic.
+  // (and no DB write path), so they default to classic. `?starburst=1`
+  // is a QA escape hatch to preview the starburst plane without a
+  // signed-in account; `?starburst=0` forces classic.
+  const emotionUiOverride =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('starburst')
+      : null;
   const emotionUiVariant: 'classic' | 'starburst' =
-    auth.state.status === 'authenticated'
+    emotionUiOverride === '1'
+      ? 'starburst'
+      : emotionUiOverride === '0'
+      ? 'classic'
+      : auth.state.status === 'authenticated'
       ? auth.state.profile.emotion_ui
       : 'classic';
 

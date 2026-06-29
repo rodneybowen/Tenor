@@ -1722,7 +1722,9 @@ button {
    navigational label rather than a button. */
 .sb-breadcrumb {
   position: absolute;
-  top: calc(env(safe-area-inset-top, 0px) + 64px);
+  /* Sit just under the header (which holds back btn + counter pill).
+     Header is ~56px tall on top of the safe area; leave 8px gap. */
+  top: calc(env(safe-area-inset-top, 0px) + 78px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 4;
@@ -1732,49 +1734,113 @@ button {
   background: var(--surface-solid);
   border: 1px solid rgba(34, 34, 34, 0.08);
   border-radius: var(--r-pill);
-  padding: 6px 14px;
+  padding: 5px 12px;
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 400;
   letter-spacing: 0.04em;
-  color: var(--charcoal);
+  color: var(--n-500);
   box-shadow: var(--shadow-card);
   cursor: pointer;
   pointer-events: auto;
 }
 .sb-breadcrumb:active { transform: translateX(-50%) scale(0.97); }
 
-/* Sub chips are slightly smaller so the layer-2 density still reads.
-   Width / height set inline in chipStyle() so we can vary by kind. */
+/* Sub + base + numb chips. Width / height / colors come from inline
+   styles in chipStyle() so we can vary by kind. */
 .sb-chip {
-  /* Inherits everything from .eg-chip; the per-kind size override
-     comes from inline style. Nothing else needs adjusting. */
+  /* Inherits everything from .eg-chip. The kind modifier sets
+     z-index so chip surfaces sit above the SVG line layer. */
+  z-index: 2;
 }
 
-/* The "Select / Go deeper" action row that lives between the def card
-   and the next button when a base or sub is centred. */
+/* SVG line layer — sits beneath every chip and badge on the plane.
+   Must not capture pointer events; chips need the taps. */
+.sb-lines {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Per-base cluster wrapper — the fisheye transform target. Contains
+   the base chip (centred at the cluster origin), the dotted stub SVG,
+   and the "Get more specific?" affordance. Cluster scales as a unit
+   so the chip + line + badge move together as the user pans (Fix 2,
+   Jun 29 2026). */
+.sb-cluster {
+  position: absolute;
+  /* Zero footprint — children position themselves relative to (0, 0). */
+  width: 0;
+  height: 0;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  will-change: transform, opacity;
+}
+/* The base chip inside the cluster sits at the cluster origin. Reset
+   the .eg-chip positioning that assumes plane-absolute coords. */
+.sb-cluster > .sb-chip--base {
+  left: 0;
+  top: 0;
+}
+/* Dotted stub SVG — absolutely positioned so SVG (0, 0) maps to chip
+   centre. overflow: visible so the line at the SVG edge stays crisp. */
+.sb-cluster__stub {
+  position: absolute;
+  pointer-events: none;
+  overflow: visible;
+}
+/* Affordance block at the far end of the stub — text + pill button,
+   stacked vertically, centred on the badge point. */
+.sb-cluster__badge {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 132px;
+  text-align: center;
+  pointer-events: auto;
+}
+.sb-cluster__hint {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: var(--n-500);
+  line-height: 1.2;
+}
+.sb-cluster__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(34, 34, 34, 0.06);
+  transition: transform 0.12s, box-shadow 0.18s;
+}
+.sb-cluster__btn:active {
+  transform: scale(0.96);
+}
+
 .sb-footer {
-  /* Make room for two extra rows (action buttons + next CTA) without
-     pushing the def card off the bottom mask. */
   padding-bottom: max(20px, env(safe-area-inset-bottom, 24px));
 }
-.sb-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  width: 100%;
-  max-width: 320px;
-}
-.sb-actions--single {
-  grid-template-columns: 1fr;
-}
-.sb-actions__select,
-.sb-actions__deeper {
-  width: 100%;
-  justify-content: center;
-}
-.sb-def__word--numb {
-  background: var(--n-200);
+
+/* Starburst removes the per-chip def card from the footer, so the
+   viewport can extend lower than the classic grid's viewport. */
+#starburst .eg-viewport {
+  bottom: 108px;
 }
 
 /* ════════════════════════════════════════════
