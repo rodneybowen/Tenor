@@ -1524,6 +1524,32 @@ button {
   text-align: center;
 }
 
+/* Starburst entry tile — replaces the quad grid in starburst mode.
+   Mirrors the radial selector's centre chip (neutral pastel circle)
+   so the scroll-down feels like the starburst plane peeking through. */
+.lm-starburst-tile {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  border: 1.5px solid var(--n-300);
+  background: var(--n-100);
+  margin-top: 12px;
+  cursor: pointer;
+  box-shadow: var(--shadow-soft);
+  transition: transform 0.18s;
+}
+.lm-starburst-tile:active { transform: scale(0.95); }
+.lm-starburst-tile__bubble {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  color: var(--n-700);
+}
+
 /* ════════════════════════════════════════════
    Emotion grid — pannable plane with lite fisheye
    ════════════════════════════════════════════ */
@@ -1716,6 +1742,17 @@ button {
 /* ════════════════════════════════════════════
    Starburst selector — overrides on .eg-* primitives
    ════════════════════════════════════════════ */
+/* Fix 3 typography (Jul 1 2026) — force Montserrat across the entire
+   starburst screen so chip labels, card text, button text, breadcrumb,
+   and the def card all share the brand sans. Inherited by every child
+   that doesn't explicitly opt out (the only opt-out is the next-CTA's
+   icon SVG, which has its own paint). */
+#starburst {
+  font-family: var(--font-sans);
+}
+#starburst button {
+  font-family: var(--font-sans);
+}
 /* Breadcrumb pill — top-centre, only renders when a base is bloomed.
    Same visual weight as the .pnav__label (Logs period label) and the
    .acct-label uppercase chip — keeps the breadcrumb feeling like a
@@ -1785,10 +1822,10 @@ button {
   pointer-events: none;
   overflow: visible;
 }
-/* Plain-white card at the far end of the stub. Hosts the
-   "Get more specific?" body text + a filled-black pill action.
-   No palette tinting (per Bug 3, Jun 30 2026) — the card must read
-   as neutral chrome so the chip's colour stays the only colour cue.
+/* Plain-white "Get more specific?" card at the far end of the stub.
+   Sized to its content (Fix 3, Jul 1 2026): width: fit-content with
+   min-width: max-content so the longest child (the pill button) sets
+   the floor; padding 16/20 so the pill never crowds the card edge.
    Inside the cluster transform, so it scales/fades with the chip. */
 .sb-cluster__card {
   position: absolute;
@@ -1796,36 +1833,39 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  width: 152px;
-  padding: 10px 12px;
+  gap: 10px;
+  width: fit-content;
+  min-width: max-content;
+  padding: 16px 20px;
   background: #ffffff;
-  border-radius: 14px;
+  border: none;
+  border-radius: 16px;
   box-shadow: 0 6px 16px rgba(34, 34, 34, 0.10);
   text-align: center;
   pointer-events: auto;
 }
 .sb-cluster__hint {
   font-family: var(--font-sans);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
-  color: var(--n-800);
+  color: var(--n-700);
   line-height: 1.25;
+  white-space: nowrap;
 }
 .sb-cluster__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 7px 12px;
+  padding: 8px 14px;
   border-radius: var(--r-pill);
   border: none;
   background: var(--n-900);
   color: #ffffff;
   font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.02em;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   cursor: pointer;
   white-space: nowrap;
   transition: transform 0.12s, background 0.18s;

@@ -4,7 +4,6 @@ import {
   PencilSimple,
   CaretDown,
   CaretUp,
-  Sparkle,
 } from '@phosphor-icons/react';
 import BackButton from '../components/BackButton';
 import { QUADRANTS, type Quadrant } from '../theme/emotions';
@@ -15,21 +14,21 @@ interface Props {
   /** Classic-mode handler — fires when the user picks one of the four
    *  HEP/HEN/LEP/LEN quadrants. Not invoked in starburst mode. */
   onPickQuadrant: (q: Quadrant) => void;
-  /** Starburst-mode handler — fires when the user picks the single
-   *  "from emotions" entry point. Not invoked in classic mode. */
+  /** Starburst-mode handler — fires when the user taps the "explore"
+   *  tile in the second snap section. Not invoked in classic mode. */
   onPickStarburst: () => void;
-  /** Current selector variant. In classic, the quadrant picker is
-   *  reachable by scrolling down. In starburst, the quadrant grid is
-   *  HIDDEN entirely (per Bug 1, Jun 30 2026) — those category labels
-   *  are not allowed to surface to a starburst user — and the
-   *  "Need help naming your feelings?" section instead routes
-   *  straight to StarburstSelectorScreen. */
+  /** Current selector variant. Both variants use the same scroll-down
+   *  affordance — what's revealed below is the only difference:
+   *    classic  → 2×2 quadrant grid (HEP/HEN/LEP/LEN)
+   *    starburst → single "explore" tile that routes into the
+   *                radial selector
+   *  Starburst users never see the HEP/HEN/LEP/LEN labels. */
   emotionUi: 'classic' | 'starburst';
   /** Which snap section to land on when this screen mounts.
-   *  Defaults to 'methods'. Classic uses 'quadrants' when returning
-   *  from the EmotionGridScreen's back button so the user lands on
-   *  the category picker. In starburst there are no quadrants — the
-   *  prop is ignored. */
+   *  'methods' = speak/type picker, 'quadrants' = the section below
+   *  (the quadrant grid in classic, the explore tile in starburst).
+   *  Used when returning from the emotion selector's back button so
+   *  the user lands where they came from. */
   initialSection?: 'methods' | 'quadrants';
 }
 
@@ -46,19 +45,20 @@ export default function LogMethodScreen({
   initialSection = 'methods',
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const quadrantsRef = useRef<HTMLElement>(null);
+  const sectionTwoRef = useRef<HTMLElement>(null);
   const methodsRef = useRef<HTMLElement>(null);
 
   function scrollTo(el: HTMLElement | null) {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Classic only — land on the requested section on mount. Skipped in
-  // starburst because the second section doesn't exist.
+  // Land on the requested section on mount — used when returning from
+  // the emotion selector's back button (initialSection='quadrants').
+  // Instant scroll (no smooth) so it reads as "opens there" rather
+  // than animating from the top.
   useEffect(() => {
-    if (emotionUi === 'starburst') return;
     if (initialSection !== 'quadrants') return;
-    const el = quadrantsRef.current;
+    const el = sectionTwoRef.current;
     const sc = scrollRef.current;
     if (!el || !sc) return;
     sc.scrollTop = el.offsetTop;
@@ -98,55 +98,59 @@ export default function LogMethodScreen({
             </div>
           </div>
 
-          {isStarburst ? (
-            // Starburst — direct route into the radial selector. No
-            // quadrant picker is shown because starburst users must
-            // never see HEP/HEN/LEP/LEN labels (Bug 1 fix).
-            <button
-              type="button"
-              className="lm-help"
-              onClick={onPickStarburst}
-            >
-              <span>
-                Need help naming your feelings?
-                <br />
-                Explore from emotions.
-              </span>
-              <Sparkle size={20} weight="regular" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="lm-help"
-              onClick={() => scrollTo(quadrantsRef.current)}
-            >
-              <span>
-                Need help naming your feelings?
-                <br />
-                Select from below.
-              </span>
-              <CaretDown size={20} weight="regular" />
-            </button>
-          )}
+          {/* Scroll-down affordance — identical gesture in classic and
+              starburst. The destination differs but the user gets
+              there the same way: scroll, don't tap a side icon. */}
+          <button
+            type="button"
+            className="lm-help"
+            onClick={() => scrollTo(sectionTwoRef.current)}
+          >
+            <span>
+              Need help naming your feelings?
+              <br />
+              Select from below.
+            </span>
+            <CaretDown size={20} weight="regular" />
+          </button>
         </section>
 
-        {/* Page 2 — classic-only quadrant picker. Tapping a quadrant
-            enters the emotion grid centered on it. Hidden entirely in
-            starburst mode so HEP/HEN/LEP/LEN labels never surface. */}
-        {!isStarburst && (
-          <section className="lm-section lm-section--quads" ref={quadrantsRef}>
+        {/* Page 2 — what's revealed depends on the variant. Both
+            sections share the same scroll-up affordance, title, and
+            sub-copy so the gesture pattern is consistent across
+            users. Only the body differs. */}
+        <section
+          className="lm-section lm-section--quads"
+          ref={sectionTwoRef}
+        >
+          <button
+            type="button"
+            className="lm-back-up"
+            aria-label="Back to log methods"
+            onClick={() => scrollTo(methodsRef.current)}
+          >
+            <CaretUp size={20} weight="regular" />
+          </button>
+
+          <h2 className="lm-quad-title">Need help naming your feelings?</h2>
+          <p className="lm-quad-sub">
+            {isStarburst
+              ? 'Tap to start exploring.'
+              : 'Pick a category to start exploring.'}
+          </p>
+
+          {isStarburst ? (
+            // Starburst — single tap-surface mimics the radial plane's
+            // centre chip. Tapping it routes to StarburstSelectorScreen.
             <button
               type="button"
-              className="lm-back-up"
-              aria-label="Back to log methods"
-              onClick={() => scrollTo(methodsRef.current)}
+              className="lm-starburst-tile"
+              onClick={onPickStarburst}
+              aria-label="Explore from emotions"
             >
-              <CaretUp size={20} weight="regular" />
+              <span className="lm-starburst-tile__bubble">explore</span>
             </button>
-
-            <h2 className="lm-quad-title">Need help naming your feelings?</h2>
-            <p className="lm-quad-sub">Pick a category to start exploring.</p>
-
+          ) : (
             <div className="quad-grid" role="group" aria-label="Emotion categories">
               {QUADRANT_GRID.map((q) => {
                 const meta = QUADRANTS[q];
@@ -162,8 +166,8 @@ export default function LogMethodScreen({
                 );
               })}
             </div>
-          </section>
-        )}
+          )}
+        </section>
       </div>
     </div>
   );

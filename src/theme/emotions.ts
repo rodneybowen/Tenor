@@ -111,16 +111,17 @@ export const STARBURST_BASES: Record<BaseEmotion, BaseEmotionMeta> = {
 };
 
 /** Ring-2 (secondary) sub-emotions for each base from the Junto
- *  Institute emotion wheel. Kept tight — 4-6 per base — so the bloom
- *  reads as a focused list, not an overwhelming cloud (per Bug 4 fix
- *  Jun 30 2026). Names are lowercase; Title-cased at render time. */
+ *  Institute emotion wheel. Strictly the secondary ring — NO ring-3
+ *  terms (per Fix 4, Jul 1 2026). Kept to 4-6 per base so the bloom
+ *  reads as a focused list, not a cloud. Names are lowercase here;
+ *  Title-cased at render. */
 export const STARBURST_SUB_EMOTIONS: Record<BaseEmotion, string[]> = {
-  surprise: ['stunned', 'confused', 'amazed', 'overcome', 'moved'],
-  joy:      ['cheerful', 'optimistic', 'content', 'peaceful', 'proud'],
-  love:     ['affectionate', 'sentimental', 'tender', 'compassionate'],
-  fear:     ['scared', 'anxious', 'insecure', 'worried', 'frightened'],
-  anger:    ['irritable', 'frustrated', 'jealous', 'hostile', 'resentful'],
-  sadness:  ['hurt', 'lonely', 'depressed', 'hopeless', 'disappointed'],
+  surprise: ['amazed', 'confused', 'astonished', 'overcome', 'moved'],
+  joy:      ['optimistic', 'peaceful', 'proud', 'content', 'accepted'],
+  love:     ['affectionate', 'romantic', 'sentimental', 'tender'],
+  fear:     ['scared', 'anxious', 'insecure', 'rejected', 'helpless'],
+  anger:    ['frustrated', 'aggressive', 'distant', 'jealous', 'irritable'],
+  sadness:  ['hurt', 'depressed', 'lonely', 'guilty', 'disappointed'],
 };
 
 /** Classic-vocabulary → base-emotion lookup for back-mapping logs that
@@ -366,8 +367,11 @@ export const EMOTION_DEFINITIONS: Record<string, string> = {
   worried: 'Mind circling something that might go wrong.',
   mortified: 'Shame and fear of being seen — wanting to vanish.',
   dreadful: 'Heavy expectation of something bad ahead.',
+  rejected: 'Cast out — wanted closeness and got a closed door.',
   // Anger
   irritable: 'Quick to bristle at small things.',
+  aggressive: 'Pushing outward with force — ready to confront.',
+  distant: "Pulled away — present in body, not in heart.",
   exasperated: 'Worn down by repeated frustration.',
   enraged: 'Anger at its loudest, hottest reach.',
   hostile: 'Set against — wanting to push back hard.',

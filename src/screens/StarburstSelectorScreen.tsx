@@ -59,36 +59,42 @@ interface Props {
 }
 
 // — Geometry ——————————————————————————————————————————————————
-// Chip sizes are intrinsic; the fisheye scale grows the centred chip
-// to ~60% of viewport width. Sub chips match base chip styling but at
-// 88% size so dense bases (5 chips) still breathe.
+// Chip intrinsic sizes. Sub chips are clearly smaller than base
+// (Fix 4 — base ≈ 52px radius, sub ≈ 36px radius). The fisheye scale
+// grows the centred chip to ~55–65% of a typical 375px viewport.
 const NUMB_CHIP = 138;
 const BASE_CHIP = 116;
-const SUB_CHIP = 104;
+const SUB_CHIP = 72;
 const BASE_RADIUS = 220;
-// SUB_RADIUS bumped to 280 so neighbouring bases' fans don't fight,
-// per Bug 4 (Jun 30 2026). MIN/MAX_FAN tuned for the new ring-2-only
-// vocabulary (4–5 chips per base).
-const SUB_RADIUS = 280;
-const MIN_FAN_DEG = 70;
+// SUB_RADIUS bumped to 300 — well over the 240px floor in Fix 4 —
+// so subs don't touch at max fisheye scale and they don't crowd the
+// adjacent base chips when the user pans outward.
+const SUB_RADIUS = 300;
+// Fan step per chip pair. With SUB_RADIUS=300, SCALE_CEIL=1.75 and
+// SUB_CHIP=72, a 30° step yields ~157px arc separation vs 126px
+// chip diameter at max scale → ~31px gap. Caps keep dense (5+) and
+// sparse (3-4) bases visually balanced.
+const FAN_STEP_DEG = 30;
+const MIN_FAN_DEG = 60;
 const MAX_FAN_DEG = 130;
 
 // Per-base affordance — dotted line + plain-white card with the
 // "Yes, let's get specific" pill. Lives inside each cluster wrapper
 // in the cluster's local coordinate space. After the global unlock
 // the card vanishes but the dotted stub stays as a directional
-// indicator (per Bug 5).
-const STUB_LEN = 80;
+// indicator (per Bug 5). STUB_LEN trimmed so the card stays inside
+// the viewport mask at max fisheye scale (Fix 3, Jul 1 2026).
+const STUB_LEN = 60;
 const STUB_START = BASE_CHIP / 2 + 2;
 const STUB_END = STUB_START + STUB_LEN;
-const BADGE_OFFSET = STUB_END + 12;
+const BADGE_OFFSET = STUB_END + 14;
 
-// Sub-emotions for the "nearest" base render when the viewport centre
-// is within this many plane-pixels of that base. The viewport mask
-// already makes far chips invisible, but explicitly limiting render
-// scope avoids visual cross-talk between adjacent bases' fans
-// (per Bug 5, Jun 30 2026).
-const PROXIMITY_RADIUS = 300;
+// Per-sub proximity gate. After unlock, every sub chip exists in the
+// DOM but each one's opacity is forced to 0 + pointer-events: none
+// until the viewport centre is within PROXIMITY_RADIUS of its own
+// coordinates (Fix 5, Jul 1 2026). Combined with a wide SUB_RADIUS
+// this naturally restricts visibility to one base's fan at a time.
+const PROXIMITY_RADIUS = 280;
 
 // Scroll-pad so the outermost chip can be panned to viewport centre.
 const PLANE_HALF = BASE_RADIUS + SUB_RADIUS + 600;
@@ -175,7 +181,10 @@ function buildBloom(base: BaseEmotion): ChipPos[] {
   const { cx, cy, angle } = BASE_POSITIONS[base];
   const n = subs.length;
   if (n === 0) return [];
-  const fan = Math.min(MAX_FAN_DEG, Math.max(MIN_FAN_DEG, (n - 1) * 22));
+  // Fan = (n-1) chip-pair steps, each FAN_STEP_DEG wide, clamped to
+  // the visible-bounds. Validated to keep chip edges from touching
+  // at max fisheye scale.
+  const fan = Math.min(MAX_FAN_DEG, Math.max(MIN_FAN_DEG, (n - 1) * FAN_STEP_DEG));
   return subs.map((name, i) => {
     const t = n === 1 ? 0.5 : i / (n - 1);
     const subAngle = angle - fan / 2 + t * fan;
@@ -220,15 +229,21 @@ export default function StarburstSelectorScreen({
   const [centered, setCentered] = useState<CenteredChip>(NUMB_CENTERED);
   const centeredKeyRef = useRef<string>('numb');
 
-  const subChips = useMemo<ChipPos[]>(
-    () => (subEmotionsUnlocked && proximityBase ? buildBloom(proximityBase) : []),
-    [subEmotionsUnlocked, proximityBase],
-  );
+  // After the global unlock, ALL bases' sub-emotions exist on the
+  // plane simultaneously (Fix 5). Per-sub opacity gating in
+  // applyFisheye handles "only one fan visible at a time" so this
+  // memo no longer cares about proximityBase.
+  const subChips = useMemo<ChipPos[]>(() => {
+    if (!subEmotionsUnlocked) return [];
+    const out: ChipPos[] = [];
+    for (const b of BASES) out.push(...buildBloom(b));
+    return out;
+  }, [subEmotionsUnlocked]);
 
   /** Every fisheye-managed target's position. Used by applyFisheye
    *  to look up where each registered ref lives on the plane, by the
-   *  scroll listener to find the nearest target, and by proximity
-   *  detection to pick which base owns the current pan position. */
+   *  scroll listener to find the nearest target, and by the
+   *  breadcrumb / def-card tracking. */
   const fisheyeTargets = useMemo(() => {
     const list: { key: string; cx: number; cy: number; kind: 'numb' | 'base' | 'sub'; base: BaseEmotion | null; name: string }[] = [
       { key: 'numb', cx: NUMB_POS.cx, cy: NUMB_POS.cy, kind: 'numb', base: null, name: 'numb' },
@@ -342,11 +357,37 @@ export default function StarburstSelectorScreen({
       const dist = Math.hypot(target.cx - vcx, target.cy - vcy);
       const t = Math.min(1, dist / FISHEYE_RADIUS);
       const scale = SCALE_CEIL - (SCALE_CEIL - SCALE_FLOOR) * t;
-      const opacity = 1 - (1 - OPACITY_FLOOR) * t;
+      const fisheyeOpacity = 1 - (1 - OPACITY_FLOOR) * t;
+
+      // Per-sub proximity gate (Fix 5). Sub chips fade fully out
+      // when the user's pan position is beyond PROXIMITY_RADIUS,
+      // and ease in over the final ~80px so the transition reads
+      // as natural fisheye + reveal rather than a hard switch.
+      let opacity = fisheyeOpacity;
+      let gated = false;
+      if (target.kind === 'sub') {
+        if (dist >= PROXIMITY_RADIUS) {
+          opacity = 0;
+          gated = true;
+        } else {
+          const easeBand = 80;
+          const proxT = Math.max(
+            0,
+            Math.min(1, (PROXIMITY_RADIUS - dist) / easeBand),
+          );
+          opacity = fisheyeOpacity * proxT;
+          if (proxT < 0.05) gated = true;
+        }
+      }
+
       el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
       el.style.opacity = opacity.toFixed(3);
+      el.style.pointerEvents = gated ? 'none' : '';
 
-      if (dist < nearestChipDist) {
+      // Only consider visible chips for "centred" tracking. Gated
+      // (invisible) subs would otherwise steal focus from the
+      // numb / base they're nominally closer to.
+      if (!gated && dist < nearestChipDist) {
         nearestChipDist = dist;
         nearestChip = target;
       }
@@ -445,6 +486,11 @@ export default function StarburstSelectorScreen({
   // Bug 2: default state is the pastel palette-100 fill; the saturated
   // primary only appears once the chip is selected. Borders use the
   // primary shade so an unselected chip is still visually anchored.
+  // Fix 2 — pastel at rest, saturated on select. Base + sub chips
+  // share the same fill/border/text shape; sub chips only differ in
+  // size. Border is palette-300 at rest (subtle anchor) and the
+  // primary darker shade on select. Ripe Lemon is so bright we use
+  // neutral-900 text on its selected fill for contrast.
   function numbStyle(isSelected: boolean): CSSProperties {
     return {
       background: isSelected ? 'var(--n-300)' : 'var(--n-100)',
@@ -454,44 +500,34 @@ export default function StarburstSelectorScreen({
       height: `${NUMB_CHIP}px`,
     };
   }
-  function baseChipStyle(b: BaseEmotion, isSelected: boolean): CSSProperties {
+  function paletteChipStyle(
+    b: BaseEmotion,
+    isSelected: boolean,
+    size: number,
+  ): CSSProperties {
     const meta = STARBURST_BASES[b];
     const primary = meta.primaryShade;
     return {
       background: isSelected
-        ? baseEmotionColor(b)
+        ? baseEmotionColor(b, primary)
         : baseEmotionColor(b, 100),
       borderColor: isSelected
         ? baseEmotionColor(b, primary === 500 ? 700 : 600)
-        : baseEmotionColor(b, primary),
+        : baseEmotionColor(b, 300),
       color: meta.palette === 'ripe-lemon'
         ? 'var(--n-900)'
         : isSelected
         ? 'var(--n-900)'
-        : baseEmotionColor(b, primary === 500 ? 700 : 700),
-      width: `${BASE_CHIP}px`,
-      height: `${BASE_CHIP}px`,
+        : baseEmotionColor(b, 600),
+      width: `${size}px`,
+      height: `${size}px`,
     };
   }
+  function baseChipStyle(b: BaseEmotion, isSelected: boolean): CSSProperties {
+    return paletteChipStyle(b, isSelected, BASE_CHIP);
+  }
   function subChipStyle(b: BaseEmotion, isSelected: boolean): CSSProperties {
-    // Bug 4: sub chips must look IDENTICAL to base chips, just sized
-    // slightly smaller. Same pastel default, same saturated-on-select.
-    const meta = STARBURST_BASES[b];
-    const primary = meta.primaryShade;
-    return {
-      background: isSelected
-        ? baseEmotionColor(b)
-        : baseEmotionColor(b, 100),
-      borderColor: isSelected
-        ? baseEmotionColor(b, primary === 500 ? 700 : 600)
-        : baseEmotionColor(b, primary),
-      color: meta.palette === 'ripe-lemon'
-        ? 'var(--n-900)'
-        : baseEmotionColor(b, 700),
-      width: `${SUB_CHIP}px`,
-      height: `${SUB_CHIP}px`,
-      fontSize: '14px',
-    };
+    return { ...paletteChipStyle(b, isSelected, SUB_CHIP), fontSize: '13px' };
   }
 
   // — Selection handlers ————————————————————————————————————
