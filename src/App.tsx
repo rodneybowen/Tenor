@@ -472,6 +472,14 @@ export default function App() {
     setScreen('emotionGrid');
   }
 
+  // Starburst entry — bypasses the classic quadrant pick. Sets no
+  // entryQuadrant (StarburstSelectorScreen doesn't need one).
+  function pickStarburst() {
+    setEmotionSelected([]);
+    setEmotionContext('');
+    setScreen('emotionGrid');
+  }
+
   function toggleEmotion(sel: EmotionSelection) {
     setEmotionSelected((prev) => {
       const idx = prev.findIndex((s) => s.name === sel.name);
@@ -803,6 +811,8 @@ export default function App() {
           onBack={() => setScreen('home')}
           onSpeak={() => setScreen('voice')}
           onPickQuadrant={pickQuadrant}
+          onPickStarburst={pickStarburst}
+          emotionUi={emotionUiVariant}
           initialSection={lmInitialSection}
         />
       )}

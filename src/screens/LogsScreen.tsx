@@ -20,6 +20,7 @@ import {
   STARBURST_LANE_ORDER,
   dotBackground,
   laneColor,
+  mapEmotionWordToBase,
   quadrantBlendBackground,
   quadrantColor,
   shadeQuadrant,
@@ -496,10 +497,21 @@ function bandYFor(emotionUi: EmotionUi, key: LaneKey): number {
 // precomputed `quadrants` array when chip-level data is missing.
 function lanesForLog(log: LogEntry, emotionUi: EmotionUi): LaneKey[] {
   if (emotionUi === 'starburst') {
-    // Starburst stores one base per LOG (column on the log row), so a
-    // single node per log unless we want to fan out to multiple lanes.
-    // The spec says lanes come from base_emotion, so one lane per log.
-    return log.baseEmotion ? [log.baseEmotion] : [];
+    // Prefer the stored base when present (logs written in starburst
+    // mode carry one). For legacy classic-mode logs the column is
+    // NULL; back-map each chip word with mapEmotionWordToBase and
+    // dedupe so the log shows up in every base lane it touches.
+    // Logs that map to nothing (e.g. only "Numb") drop from the chart.
+    if (log.baseEmotion) return [log.baseEmotion];
+    const seen = new Set<BaseEmotion>();
+    const out: BaseEmotion[] = [];
+    for (const c of log.chips ?? []) {
+      const b = mapEmotionWordToBase(c.text);
+      if (!b || seen.has(b)) continue;
+      seen.add(b);
+      out.push(b);
+    }
+    return out;
   }
   const seen = new Set<Quadrant>();
   const seq: Quadrant[] = [];

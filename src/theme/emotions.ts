@@ -110,44 +110,86 @@ export const STARBURST_BASES: Record<BaseEmotion, BaseEmotionMeta> = {
   },
 };
 
-/** Sub-emotions for each base, sourced from the Junto Institute wheel
- *  (TENOR_CONTEXT.md → Starburst emotion hierarchy). Used to bloom
- *  chips outward when the user taps "Go deeper" on a base emotion.
- *  Names are lowercase here and Title-cased at render time. */
+/** Ring-2 (secondary) sub-emotions for each base from the Junto
+ *  Institute emotion wheel. Kept tight — 4-6 per base — so the bloom
+ *  reads as a focused list, not an overwhelming cloud (per Bug 4 fix
+ *  Jun 30 2026). Names are lowercase; Title-cased at render time. */
 export const STARBURST_SUB_EMOTIONS: Record<BaseEmotion, string[]> = {
-  surprise: [
-    'stunned', 'confused', 'amazed', 'overcome', 'moved', 'stimulated',
-    'astonished', 'awe-struck', 'speechless', 'astounded',
-  ],
-  joy: [
-    'excited', 'optimistic', 'proud', 'cheerful', 'happy', 'content',
-    'peaceful', 'enthusiastic', 'hopeful', 'playful', 'amused',
-    'delighted', 'jovial', 'pleased', 'satisfied', 'serene', 'tranquil',
-  ],
-  love: [
-    'enchanted', 'romantic', 'affectionate', 'sentimental', 'grateful',
-    'appreciative', 'thankful', 'nostalgic', 'tender', 'compassionate',
-    'warmhearted', 'passionate', 'enamored', 'rapturous', 'enthralled',
-    'jubilant', 'elated',
-  ],
-  fear: [
-    'scared', 'terrified', 'insecure', 'nervous', 'horrified',
-    'frightened', 'helpless', 'panicked', 'hysterical', 'inferior',
-    'inadequate', 'worried', 'anxious', 'mortified', 'dreadful',
-  ],
-  anger: [
-    'irritable', 'exasperated', 'enraged', 'hostile', 'jealous',
-    'disgusted', 'hateful', 'agitated', 'frustrated', 'annoyed',
-    'aggravated', 'resentful', 'envious', 'contemptuous', 'revolted',
-  ],
-  sadness: [
-    'hurt', 'unhappy', 'disappointed', 'shameful', 'lonely', 'gloomy',
-    'isolated', 'neglected', 'hopeless', 'depressed', 'shocked',
-    'bewildered', 'disillusioned', 'perplexed', 'agonized', 'disturbed',
-    'miserable', 'disheartened', 'dismayed', 'displeased', 'regretful',
-    'guilty',
-  ],
+  surprise: ['stunned', 'confused', 'amazed', 'overcome', 'moved'],
+  joy:      ['cheerful', 'optimistic', 'content', 'peaceful', 'proud'],
+  love:     ['affectionate', 'sentimental', 'tender', 'compassionate'],
+  fear:     ['scared', 'anxious', 'insecure', 'worried', 'frightened'],
+  anger:    ['irritable', 'frustrated', 'jealous', 'hostile', 'resentful'],
+  sadness:  ['hurt', 'lonely', 'depressed', 'hopeless', 'disappointed'],
 };
+
+/** Classic-vocabulary → base-emotion lookup for back-mapping logs that
+ *  pre-date starburst (no `base_emotion` column). Keys are lowercase.
+ *  Built from the four classic quadrants:
+ *    HEP + most LEP → joy   (positive affect, energy independent)
+ *    LEP affection-y → love (warmth toward another)
+ *    HEN anger-y    → anger
+ *    HEN fear-y     → fear
+ *    LEN            → sadness (Numb stays null — it's the centre chip) */
+const CLASSIC_TO_BASE: Record<string, BaseEmotion> = {
+  // joy
+  cheerful: 'joy', optimistic: 'joy', amused: 'joy', hopeful: 'joy',
+  happy: 'joy', enthusiastic: 'joy', proud: 'joy', excited: 'joy',
+  inspired: 'joy', elated: 'joy', joyful: 'joy',
+  calm: 'joy', comfortable: 'joy', relaxed: 'joy', 'at ease': 'joy',
+  grounded: 'joy', content: 'joy', satisfied: 'joy', peaceful: 'joy',
+  serene: 'joy',
+  // love
+  grateful: 'love', tender: 'love', thankful: 'love', accepted: 'love',
+  // anger
+  irritated: 'anger', frustrated: 'anger', angry: 'anger',
+  furious: 'anger', disgusted: 'anger', agitated: 'anger',
+  // fear
+  anxious: 'fear', nervous: 'fear', stressed: 'fear',
+  overwhelmed: 'fear', panicked: 'fear', tense: 'fear',
+  // sadness
+  bored: 'sadness', tired: 'sadness', disappointed: 'sadness',
+  disconnected: 'sadness', sad: 'sadness', melancholy: 'sadness',
+  lonely: 'sadness', exhausted: 'sadness', empty: 'sadness',
+  defeated: 'sadness', hopeless: 'sadness',
+};
+
+/** Resolve an emotion word to one of the 6 starburst base emotions.
+ *
+ *  Used in the starburst chart variant to place legacy classic-mode
+ *  logs into the correct lane — they don't carry a `base_emotion`
+ *  column so we infer it from each chip word. Resolution order:
+ *    1. Exact match in the starburst sub-emotion lists (cheap, exact)
+ *    2. Lookup in CLASSIC_TO_BASE (covers the classic 4-quadrant
+ *       vocabulary)
+ *    3. null — unclassifiable; caller should drop the log from the
+ *       starburst chart
+ *
+ *  Comparison is case-insensitive. Numb deliberately resolves to null
+ *  (it's the centre chip, not a base). */
+export function mapEmotionWordToBase(word: string): BaseEmotion | null {
+  if (!word) return null;
+  const lower = word.toLowerCase();
+  if (lower === 'numb') return null;
+  for (const base of Object.keys(STARBURST_SUB_EMOTIONS) as BaseEmotion[]) {
+    if (STARBURST_SUB_EMOTIONS[base].includes(lower)) return base;
+  }
+  return CLASSIC_TO_BASE[lower] ?? null;
+}
+
+/** Case-insensitive emotion definition lookup. EMOTION_DEFINITIONS
+ *  carries both Title-Case (classic vocabulary) and lowercase
+ *  (starburst sub-emotion vocabulary) keys; this helper tries both
+ *  plus the 6 base-emotion definitions held on STARBURST_BASES. */
+export function getEmotionDefinition(word: string): string {
+  if (!word) return '';
+  const base = STARBURST_BASES[word as BaseEmotion];
+  if (base) return base.definition;
+  const exact = EMOTION_DEFINITIONS[word];
+  if (exact) return exact;
+  const titled = word.replace(/(^|[\s-])(\w)/g, (_, p, c) => p + c.toUpperCase());
+  return EMOTION_DEFINITIONS[titled] ?? '';
+}
 
 /** Visualisation lane order for the starburst variant (matches the
  *  spec: Surprise → Joy → Love → Fear → Anger → Sadness). The

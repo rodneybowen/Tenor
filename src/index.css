@@ -1765,82 +1765,104 @@ button {
 }
 
 /* Per-base cluster wrapper — the fisheye transform target. Contains
-   the base chip (centred at the cluster origin), the dotted stub SVG,
-   and the "Get more specific?" affordance. Cluster scales as a unit
-   so the chip + line + badge move together as the user pans (Fix 2,
-   Jun 29 2026). */
+   the base chip (at the cluster origin), the dotted stub SVG, and
+   the plain white "Get more specific?" card. Cluster scales as a unit
+   so the chip + line + card pan and scale together. */
 .sb-cluster {
   position: absolute;
-  /* Zero footprint — children position themselves relative to (0, 0). */
   width: 0;
   height: 0;
   transform: translate(-50%, -50%);
   z-index: 2;
   will-change: transform, opacity;
 }
-/* The base chip inside the cluster sits at the cluster origin. Reset
-   the .eg-chip positioning that assumes plane-absolute coords. */
 .sb-cluster > .sb-chip--base {
   left: 0;
   top: 0;
 }
-/* Dotted stub SVG — absolutely positioned so SVG (0, 0) maps to chip
-   centre. overflow: visible so the line at the SVG edge stays crisp. */
 .sb-cluster__stub {
   position: absolute;
   pointer-events: none;
   overflow: visible;
 }
-/* Affordance block at the far end of the stub — text + pill button,
-   stacked vertically, centred on the badge point. */
-.sb-cluster__badge {
+/* Plain-white card at the far end of the stub. Hosts the
+   "Get more specific?" body text + a filled-black pill action.
+   No palette tinting (per Bug 3, Jun 30 2026) — the card must read
+   as neutral chrome so the chip's colour stays the only colour cue.
+   Inside the cluster transform, so it scales/fades with the chip. */
+.sb-cluster__card {
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 132px;
+  gap: 8px;
+  width: 152px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 6px 16px rgba(34, 34, 34, 0.10);
   text-align: center;
   pointer-events: auto;
 }
 .sb-cluster__hint {
   font-family: var(--font-sans);
-  font-size: 11px;
-  font-weight: 300;
-  letter-spacing: 0.02em;
-  color: var(--n-500);
-  line-height: 1.2;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--n-800);
+  line-height: 1.25;
 }
 .sb-cluster__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 4px;
-  padding: 6px 10px;
+  padding: 7px 12px;
   border-radius: var(--r-pill);
-  border: 1px solid transparent;
+  border: none;
+  background: var(--n-900);
+  color: #ffffff;
   font-family: var(--font-sans);
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.02em;
   cursor: pointer;
   white-space: nowrap;
-  box-shadow: 0 1px 3px rgba(34, 34, 34, 0.06);
-  transition: transform 0.12s, box-shadow 0.18s;
+  transition: transform 0.12s, background 0.18s;
 }
-.sb-cluster__btn:active {
-  transform: scale(0.96);
+.sb-cluster__btn:hover { background: var(--n-800); }
+.sb-cluster__btn:active { transform: scale(0.96); }
+
+/* Bottom def card — the per-screen definition pill + body that
+   mirrors the classic emotion grid (Bug 6). Lives in .sb-footer.
+   Updates as the centred chip changes. */
+.sb-def {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  min-height: 92px;
+  background: var(--surface-solid);
+  border: 1px solid rgba(34, 34, 34, 0.06);
+  border-radius: 24px;
+  padding: 18px 22px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+  box-sizing: border-box;
+  box-shadow: 0 2px 10px rgba(34, 34, 34, 0.04);
+  margin-bottom: 6px;
+}
+.sb-def__select {
+  width: 100%;
+  max-width: 220px;
+  margin-top: 4px;
+  justify-content: center;
 }
 
 .sb-footer {
   padding-bottom: max(20px, env(safe-area-inset-bottom, 24px));
-}
-
-/* Starburst removes the per-chip def card from the footer, so the
-   viewport can extend lower than the classic grid's viewport. */
-#starburst .eg-viewport {
-  bottom: 108px;
 }
 
 /* ════════════════════════════════════════════
