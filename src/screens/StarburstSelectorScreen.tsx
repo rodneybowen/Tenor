@@ -92,9 +92,9 @@ const CENTER_Y = PLANE_HALF;
 // — Fisheye tuning ————————————————————————————————————————————
 // Scale formula (Jul 2 2026): max 1.2× at viewport centre, 0.75× at
 // or beyond FISHEYE_RADIUS — keeps chips legible without ballooning.
+// SCALE_FLOOR (0.75) lives inline in the formula below.
 const FISHEYE_RADIUS = 240;
 const SCALE_CEIL = 1.2;
-const SCALE_FLOOR = 0.75;
 const OPACITY_FLOOR = 0.42;
 
 function titleCase(s: string): string {
