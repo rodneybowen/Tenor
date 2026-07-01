@@ -655,13 +655,35 @@ The starburst is a 2D plane inside the same fisheye panning system as the classi
 - **Base emotions:** 6 chips at 60° increments, radius ≈ 220px from center. Clockwise from top: **Surprise** (0°), **Joy** (60°), **Love** (120°), **Fear** (180°), **Anger** (240°), **Sadness** (300°). Palette mapping: Surprise → Feijoa, Joy → Ripe Lemon, Love → Lilac Bush (500), Fear → Geraldine, Anger → Hit Pink, Sadness → Picton Blue.
 - **Sub-emotions:** positioned radiating outward from their parent base emotion's coordinates (NOT from center), radius ≈ 180px from the base emotion chip. Equal angular spread fanning away from center. Sub-emotion chips use their parent's palette (lighter shade background, primary shade border/text). **Hidden by default.**
 
-### "Get more specific" affordance — dotted line + badge
-Each base emotion chip has a **dotted line** extending outward (away from center) to a small persistent badge that reads **"Get more specific?"** with a **"Yes, let's get specific"** tap target. This affordance is always present on every base emotion — it does not require a tap to appear; users see it as they pan near any base emotion chip.
+### "Get more specific" affordance — dotted line + card (snap node)
+Each base emotion chip has a **dotted line** extending outward (away from center) to a plain-white **"Get more specific?"** card with a black **"Yes, let's get specific"** pill button. The card is a **first-class snap node** on the plane — it has its own (x, y) coordinates (chip center + 180px along the outward radial), its own scroll-snap-align: center, and its own entry in the fisheye target list. Panning past the chip snaps to the card; the card is fully readable only at centre.
 
-- **Tap "Yes, let's get specific":** Dotted line animates to a **solid line**. Badge disappears and sub-emotion chips bloom outward from that base emotion's position. Breadcrumb at top updates to `[Base] →` (e.g., `Fear →`), Montserrat Label, neutral-400.
-- **Ignore it:** User can pan freely or tap the base emotion chip to select it — sub-emotions never appear.
-- **One expansion at a time:** When user taps "Yes" on a different base emotion, the previously expanded one collapses (solid → dotted, sub-emotions disappear). Only one base emotion expanded simultaneously.
-- **"Numb" has no dotted line or badge** — tap-to-select only.
+- **Tap "Yes, let's get specific":** the global unlock fires (`subEmotionsUnlocked = true`) AND `activeBase` is set immediately to that card's base emotion (no waiting on a scrollend). Cards disappear everywhere. Short dotted directional stubs replace the long chip→card lines on every base. The just-tapped base's sub-emotion fan becomes visible (since `activeBase` already matches its base and the user is positioned outward past the chip).
+- **One expansion at a time:** sub-emotion visibility is governed by the **`activeBase` state machine** below — only the active base's subs ever render at opacity > 0.
+- **"Numb" has no dotted line or card** — tap-to-select only.
+
+### Sub-emotion visibility — `activeBase` state machine (Jul 2 2026)
+Replaces all earlier coordinate-proximity logic.
+
+- **State:** `activeBase: BaseEmotion | null` (React state, default `null`).
+- **Trigger:** on every `scrollend`, if the nearest snap target within `SNAP_THRESHOLD_PX = 24` is a base chip:
+  - if `activeBase === thatBase` → set to `null` (return-journey toggle: subs collapse, dotted line reappears)
+  - else → set to `thatBase` (previous base's subs collapse instantly)
+- **Visibility rule:** a sub chip of base `B` is visible iff BOTH:
+  1. `activeBase === B`
+  2. `panDot > BASE_RADIUS`, where `panDot = dot(viewportCenter − planeCenter, B.outwardUnitVector)` — i.e. the user has panned outward past the chip along its own radial axis.
+  All other base's subs stay at `opacity: 0; pointer-events: none` regardless of where they sit on the plane.
+- **Dotted line:**
+  - Pre-unlock: long chip→card dotted line per base, always visible.
+  - Post-unlock: short outward dotted stub per base, hidden when `activeBase === thatBase && panDot > BASE_RADIUS` (the line has done its job — subs are open), visible otherwise.
+- **CSS transition:** `.sb-chip--sub { transition: opacity 150ms ease; }` and the dotted-stub `<line>` elements also use `transition: opacity 150ms ease` for smooth fade in/out.
+
+### Fisheye + gap-breathing (Jul 2 2026)
+- **Scale formula:** `scale = min(1.2, 0.75 + 0.45 * (1 − clamp(dist / FISHEYE_RADIUS, 0, 1)))`. Max **1.2×** at viewport centre, **0.75×** at or beyond `FISHEYE_RADIUS = 240`. Replaces the earlier 1.75× ceiling — chips no longer balloon.
+- **Gap-breathing:** the starburst plane carries `transform: scale(var(--sb-gap-factor, 1))` with `transition: transform 200ms ease-out`. `--sb-gap-factor` is mutated on the viewport DOM node by `touchstart` / `touchend` listeners — `0.9` on touchstart ("inhale"), `1.0` on touchend ("release"). Touch-cancel resets the same as touchend.
+
+### Chip label typography
+`.sb-chip` uses `var(--font-sans)`, `font-size: 13px`, `font-weight: 400`, `letter-spacing: normal` — matches the design-system body label size (same as `.keyword`) without inheriting `.keyword`'s background/border/padding visual chrome.
 
 ### Selection model
 Nothing auto-selects. All selection requires an explicit tap on a chip.

@@ -1524,30 +1524,16 @@ button {
   text-align: center;
 }
 
-/* Starburst entry tile — replaces the quad grid in starburst mode.
-   Mirrors the radial selector's centre chip (neutral pastel circle)
-   so the scroll-down feels like the starburst plane peeking through. */
-.lm-starburst-tile {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 168px;
-  height: 168px;
-  border-radius: 50%;
-  border: 1.5px solid var(--n-300);
-  background: var(--n-100);
-  margin-top: 12px;
-  cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  transition: transform 0.18s;
-}
-.lm-starburst-tile:active { transform: scale(0.95); }
-.lm-starburst-tile__bubble {
-  font-family: var(--font-sans);
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: 0.03em;
-  color: var(--n-700);
+/* Starburst scroll sensor (Fix 1, Jul 1 2026) — invisible block
+   below the speak/type section that gives the lm-body enough scroll
+   height for swipe-down detection. The scroll listener in
+   LogMethodScreen.tsx fires onPickStarburst when scrollTop crosses
+   the methods-section threshold; this sensor exists only to give
+   the user something to scroll into. No visible content. */
+.lm-starburst-sensor {
+  height: 60vh;
+  scroll-snap-align: none;
+  pointer-events: none;
 }
 
 /* ════════════════════════════════════════════
@@ -1753,6 +1739,15 @@ button {
 #starburst button {
   font-family: var(--font-sans);
 }
+/* Gap breathing (Jul 2 2026) — the plane inhales to 0.9× while a
+   finger is on screen, then eases back to 1.0× over 200ms on
+   touchend. --sb-gap-factor is mutated on the viewport by
+   StarburstSelectorScreen's touchstart / touchend handlers. */
+#starburst .eg-plane {
+  transform: scale(var(--sb-gap-factor, 1));
+  transform-origin: center center;
+  transition: transform 200ms ease-out;
+}
 /* Breadcrumb pill — top-centre, only renders when a base is bloomed.
    Same visual weight as the .pnav__label (Logs period label) and the
    .acct-label uppercase chip — keeps the breadcrumb feeling like a
@@ -1784,15 +1779,26 @@ button {
 .sb-breadcrumb:active { transform: translateX(-50%) scale(0.97); }
 
 /* Sub + base + numb chips. Width / height / colors come from inline
-   styles in chipStyle() so we can vary by kind. */
+   styles in chipStyle() — only the typography + z-index live here.
+   Chip label typography (Jul 2 2026) follows the design-system body
+   label (same size/weight as .keyword), set on the chip itself so we
+   don't pollute it with .keyword's background/border/padding chrome. */
 .sb-chip {
-  /* Inherits everything from .eg-chip. The kind modifier sets
-     z-index so chip surfaces sit above the SVG line layer. */
   z-index: 2;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+/* Fix 4 (Jul 1 2026) — sub chips fade in/out as the user pans into
+   and out of their proximity range. Inline opacity is set in
+   applyFisheye; the transition runs visually. */
+.sb-chip--sub {
+  transition: opacity 150ms ease, transform 0.18s, box-shadow 0.18s, border-color 0.18s;
 }
 
-/* SVG line layer — sits beneath every chip and badge on the plane.
-   Must not capture pointer events; chips need the taps. */
+/* SVG line layer — sits beneath every chip and card on the plane.
+   Must not capture pointer events; chips/cards need the taps. */
 .sb-lines {
   position: absolute;
   top: 0;
@@ -1801,35 +1807,16 @@ button {
   z-index: 1;
 }
 
-/* Per-base cluster wrapper — the fisheye transform target. Contains
-   the base chip (at the cluster origin), the dotted stub SVG, and
-   the plain white "Get more specific?" card. Cluster scales as a unit
-   so the chip + line + card pan and scale together. */
-.sb-cluster {
+/* "Get more specific?" card — Fix 2 (Jul 1 2026) — an INDEPENDENT
+   snap node positioned on the plane like any chip. Has its own (x, y)
+   coordinates and its own scroll-snap-align: center so the browser's
+   snap system pulls toward it independently of the parent chip.
+   Plain white, dark text, content-sized — no palette tinting. */
+.sb-card {
   position: absolute;
-  width: 0;
-  height: 0;
   transform: translate(-50%, -50%);
   z-index: 2;
-  will-change: transform, opacity;
-}
-.sb-cluster > .sb-chip--base {
-  left: 0;
-  top: 0;
-}
-.sb-cluster__stub {
-  position: absolute;
-  pointer-events: none;
-  overflow: visible;
-}
-/* Plain-white "Get more specific?" card at the far end of the stub.
-   Sized to its content (Fix 3, Jul 1 2026): width: fit-content with
-   min-width: max-content so the longest child (the pill button) sets
-   the floor; padding 16/20 so the pill never crowds the card edge.
-   Inside the cluster transform, so it scales/fades with the chip. */
-.sb-cluster__card {
-  position: absolute;
-  transform: translate(-50%, -50%);
+  scroll-snap-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1843,8 +1830,9 @@ button {
   box-shadow: 0 6px 16px rgba(34, 34, 34, 0.10);
   text-align: center;
   pointer-events: auto;
+  will-change: transform, opacity;
 }
-.sb-cluster__hint {
+.sb-card__hint {
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 400;
@@ -1852,7 +1840,7 @@ button {
   line-height: 1.25;
   white-space: nowrap;
 }
-.sb-cluster__btn {
+.sb-card__btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1870,8 +1858,8 @@ button {
   white-space: nowrap;
   transition: transform 0.12s, background 0.18s;
 }
-.sb-cluster__btn:hover { background: var(--n-800); }
-.sb-cluster__btn:active { transform: scale(0.96); }
+.sb-card__btn:hover { background: var(--n-800); }
+.sb-card__btn:active { transform: scale(0.96); }
 
 /* Bottom def card — the per-screen definition pill + body that
    mirrors the classic emotion grid (Bug 6). Lives in .sb-footer.

@@ -14,26 +14,23 @@ interface Props {
   /** Classic-mode handler — fires when the user picks one of the four
    *  HEP/HEN/LEP/LEN quadrants. Not invoked in starburst mode. */
   onPickQuadrant: (q: Quadrant) => void;
-  /** Starburst-mode handler — fires when the user taps the "explore"
-   *  tile in the second snap section. Not invoked in classic mode. */
+  /** Starburst-mode handler — fires when the user crosses the scroll
+   *  threshold below the speak/type section (or taps the caret CTA).
+   *  Not invoked in classic mode. */
   onPickStarburst: () => void;
-  /** Current selector variant. Both variants use the same scroll-down
-   *  affordance — what's revealed below is the only difference:
-   *    classic  → 2×2 quadrant grid (HEP/HEN/LEP/LEN)
-   *    starburst → single "explore" tile that routes into the
-   *                radial selector
-   *  Starburst users never see the HEP/HEN/LEP/LEN labels. */
+  /** Current selector variant. Both variants share the speak/type
+   *  section and a scroll-down affordance. Classic scrolls into a
+   *  4-quadrant grid (HEP/HEN/LEP/LEN); starburst routes DIRECTLY into
+   *  StarburstSelectorScreen — no intermediate "explore" screen
+   *  (Fix 1, Jul 1 2026). */
   emotionUi: 'classic' | 'starburst';
   /** Which snap section to land on when this screen mounts.
-   *  'methods' = speak/type picker, 'quadrants' = the section below
-   *  (the quadrant grid in classic, the explore tile in starburst).
-   *  Used when returning from the emotion selector's back button so
-   *  the user lands where they came from. */
+   *  Classic only — 'quadrants' lands on the quadrant grid, used when
+   *  returning from EmotionGridScreen's back button. Starburst always
+   *  mounts at the methods section. */
   initialSection?: 'methods' | 'quadrants';
 }
 
-// Classic-only — four-quadrant grid (HEP top-left, HEN top-right,
-// LEP bot-left, LEN bot-right). Never rendered in starburst mode.
 const QUADRANT_GRID: Quadrant[] = ['hep', 'hen', 'lep', 'len'];
 
 export default function LogMethodScreen({
@@ -45,27 +42,63 @@ export default function LogMethodScreen({
   initialSection = 'methods',
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const sectionTwoRef = useRef<HTMLElement>(null);
+  const quadrantsRef = useRef<HTMLElement>(null);
   const methodsRef = useRef<HTMLElement>(null);
+  const sensorRef = useRef<HTMLDivElement>(null);
+
+  const isStarburst = emotionUi === 'starburst';
 
   function scrollTo(el: HTMLElement | null) {
     el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Land on the requested section on mount — used when returning from
-  // the emotion selector's back button (initialSection='quadrants').
-  // Instant scroll (no smooth) so it reads as "opens there" rather
-  // than animating from the top.
+  // Classic only — land on the requested section on mount. Instant
+  // scroll (no smooth) so the screen reads as "opens there" when
+  // returning from the EmotionGridScreen back button.
   useEffect(() => {
+    if (isStarburst) return;
     if (initialSection !== 'quadrants') return;
-    const el = sectionTwoRef.current;
+    const el = quadrantsRef.current;
     const sc = scrollRef.current;
     if (!el || !sc) return;
     sc.scrollTop = el.offsetTop;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const isStarburst = emotionUi === 'starburst';
+  // Starburst (Fix 1) — when the user starts scrolling past the
+  // speak/type section, route DIRECTLY into the starburst selector.
+  // No intermediate explore screen. The same handler fires for either
+  // gesture: a finger swipe down (scroll event) or a tap on the
+  // caret-down CTA (which scrolls into the sensor).
+  useEffect(() => {
+    if (!isStarburst) return;
+    const sc = scrollRef.current;
+    const m = methodsRef.current;
+    if (!sc || !m) return;
+    let fired = false;
+    function onScroll() {
+      if (fired) return;
+      // Fire as soon as the user crosses ~30% of the methods section
+      // height — that's about the point where the scroll feels
+      // intentional but well before any "second screen" would render.
+      const threshold = Math.max(80, (m?.offsetHeight ?? 0) * 0.3);
+      if (sc && sc.scrollTop > threshold) {
+        fired = true;
+        onPickStarburst();
+      }
+    }
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    return () => sc.removeEventListener('scroll', onScroll);
+  }, [isStarburst, onPickStarburst]);
+
+  function onHelpClick() {
+    if (isStarburst) {
+      // Tap path — bypass the scroll sensor entirely.
+      onPickStarburst();
+      return;
+    }
+    scrollTo(quadrantsRef.current);
+  }
 
   return (
     <div className="screen" id="log-method">
@@ -98,14 +131,7 @@ export default function LogMethodScreen({
             </div>
           </div>
 
-          {/* Scroll-down affordance — identical gesture in classic and
-              starburst. The destination differs but the user gets
-              there the same way: scroll, don't tap a side icon. */}
-          <button
-            type="button"
-            className="lm-help"
-            onClick={() => scrollTo(sectionTwoRef.current)}
-          >
+          <button type="button" className="lm-help" onClick={onHelpClick}>
             <span>
               Need help naming your feelings?
               <br />
@@ -115,42 +141,37 @@ export default function LogMethodScreen({
           </button>
         </section>
 
-        {/* Page 2 — what's revealed depends on the variant. Both
-            sections share the same scroll-up affordance, title, and
-            sub-copy so the gesture pattern is consistent across
-            users. Only the body differs. */}
-        <section
-          className="lm-section lm-section--quads"
-          ref={sectionTwoRef}
-        >
-          <button
-            type="button"
-            className="lm-back-up"
-            aria-label="Back to log methods"
-            onClick={() => scrollTo(methodsRef.current)}
+        {/* Starburst — invisible scroll sensor below methods. Gives
+            the lm-body enough scroll height for swipe-down detection,
+            and the scroll listener above fires onPickStarburst as
+            soon as the user crosses the threshold. */}
+        {isStarburst && (
+          <div
+            ref={sensorRef}
+            className="lm-starburst-sensor"
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Classic — quadrant picker section. Tapping a quadrant
+            enters EmotionGridScreen centered on it. */}
+        {!isStarburst && (
+          <section
+            className="lm-section lm-section--quads"
+            ref={quadrantsRef}
           >
-            <CaretUp size={20} weight="regular" />
-          </button>
-
-          <h2 className="lm-quad-title">Need help naming your feelings?</h2>
-          <p className="lm-quad-sub">
-            {isStarburst
-              ? 'Tap to start exploring.'
-              : 'Pick a category to start exploring.'}
-          </p>
-
-          {isStarburst ? (
-            // Starburst — single tap-surface mimics the radial plane's
-            // centre chip. Tapping it routes to StarburstSelectorScreen.
             <button
               type="button"
-              className="lm-starburst-tile"
-              onClick={onPickStarburst}
-              aria-label="Explore from emotions"
+              className="lm-back-up"
+              aria-label="Back to log methods"
+              onClick={() => scrollTo(methodsRef.current)}
             >
-              <span className="lm-starburst-tile__bubble">explore</span>
+              <CaretUp size={20} weight="regular" />
             </button>
-          ) : (
+
+            <h2 className="lm-quad-title">Need help naming your feelings?</h2>
+            <p className="lm-quad-sub">Pick a category to start exploring.</p>
+
             <div className="quad-grid" role="group" aria-label="Emotion categories">
               {QUADRANT_GRID.map((q) => {
                 const meta = QUADRANTS[q];
@@ -166,8 +187,8 @@ export default function LogMethodScreen({
                 );
               })}
             </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </div>
   );
