@@ -1004,18 +1004,23 @@ button {
   border-radius: 3px;
   background: var(--charcoal);
 }
-.wave--on span {
-  animation: wv 1s ease infinite;
+/* Amplitude-driven bars — height reads from a per-bar CSS custom
+   property (--w-0 through --w-8) that useMicLevel writes each rAF
+   tick. Silence → var stays near 0 → bar sits at 6px. Loud speech
+   → var approaches 1 → bar reaches ~26px. Short transition smooths
+   frame-to-frame jitter without lagging behind speech. */
+.wave--live .wave__b {
+  transition: height 60ms linear;
 }
-@keyframes wv {
-  0%,
-  100% {
-    height: 6px;
-  }
-  50% {
-    height: 24px;
-  }
-}
+.wave--live .wave__b--0 { height: calc(6px + 20px * var(--w-0, 0)); }
+.wave--live .wave__b--1 { height: calc(6px + 20px * var(--w-1, 0)); }
+.wave--live .wave__b--2 { height: calc(6px + 20px * var(--w-2, 0)); }
+.wave--live .wave__b--3 { height: calc(6px + 20px * var(--w-3, 0)); }
+.wave--live .wave__b--4 { height: calc(6px + 20px * var(--w-4, 0)); }
+.wave--live .wave__b--5 { height: calc(6px + 20px * var(--w-5, 0)); }
+.wave--live .wave__b--6 { height: calc(6px + 20px * var(--w-6, 0)); }
+.wave--live .wave__b--7 { height: calc(6px + 20px * var(--w-7, 0)); }
+.wave--live .wave__b--8 { height: calc(6px + 20px * var(--w-8, 0)); }
 .stop-btn {
   width: 88px;
   height: 88px;
@@ -1035,6 +1040,17 @@ button {
 .stop-btn:focus-visible {
   outline: 2px solid var(--charcoal);
   outline-offset: 4px;
+}
+/* Disabled while the recognizer is still holding uncommitted
+   interim text — dim + no-op cursor. Prevents the user from
+   stopping mid-word and losing the in-flight utterance. */
+.stop-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  transform: none;
+}
+.stop-btn:disabled:active {
+  transform: none;
 }
 .voice-hint {
   font-size: 12px;

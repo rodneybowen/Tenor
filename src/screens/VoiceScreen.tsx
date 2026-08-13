@@ -19,6 +19,7 @@ import {
   extractEmotions,
   type Detected,
 } from '../lib/emotionDetect';
+import { useMicLevel } from '../lib/micLevel';
 import { quadrantColor } from '../theme/emotions';
 
 const DEMO_SCRIPT =
@@ -56,6 +57,12 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
   // can see something's happening (and can't double-tap).
   const [submitting, setSubmitting] = useState(false);
   const demoTimer = useRef<number | null>(null);
+
+  // Wave container — receives per-bar amplitude via CSS custom
+  // properties written by useMicLevel each rAF tick. Enabled only
+  // in the record phase and skipped in demo mode (no real mic).
+  const waveRef = useRef<HTMLDivElement>(null);
+  useMicLevel(waveRef, phase === 'record' && !demo);
 
   // Keep the latest transcript reachable from timers/handlers.
   const transcriptRef = useRef('');
@@ -114,10 +121,7 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Set while we're tearing down SR + running detectEmotions. The
-  // stop button reads this and disables — same debounce as
-  // QuickLogScreen's tap-anywhere target so a panicked second tap
-  // can't re-enter the handler mid-extraction.
+  // Set while we're tearing down SR + running detectEmotions.
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Never disabled on first render. Becomes disable-able only after
@@ -127,7 +131,24 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
   if ((sr.transcript || sr.interim) && !sawAnyResultRef.current) {
     sawAnyResultRef.current = true;
   }
-  const stopDisabled = isProcessing && sawAnyResultRef.current;
+
+  // Analysing = the speech recognizer is holding uncommitted interim
+  // text and hasn't produced a final result yet. If the user stops
+  // during this window they'd lose those in-flight words. A short
+  // trailing debounce (250ms) keeps the button from flickering
+  // on/off between quick consecutive words.
+  const [analysing, setAnalysing] = useState(false);
+  useEffect(() => {
+    if (sr.interim.trim().length > 0) {
+      setAnalysing(true);
+      return;
+    }
+    const t = window.setTimeout(() => setAnalysing(false), 250);
+    return () => window.clearTimeout(t);
+  }, [sr.interim]);
+
+  const stopDisabled =
+    isProcessing || (sawAnyResultRef.current && analysing);
 
   function handleStop() {
     if (isProcessing) return;
@@ -232,21 +253,38 @@ export default function VoiceScreen({ demo, onBack, onConfirm }: Props) {
           </div>
 
           <div className="voice-foot">
-            <div className={`wave${capturing ? ' wave--on' : ''}`}>
+            {/* Wave — nine bars whose heights are driven by CSS
+                custom properties `--w-0`..`--w-8`, written each rAF
+                by useMicLevel from real mic amplitude. At rest
+                (silence) all vars hold ~0 and the bars sit flat. */}
+            <div
+              className={
+                'wave wave--live' +
+                (capturing ? ' wave--on' : '')
+              }
+              ref={waveRef}
+              aria-hidden="true"
+            >
               {Array.from({ length: 9 }).map((_, i) => (
-                <span key={i} style={{ animationDelay: `${i * 90}ms` }} />
+                <span key={i} className={`wave__b wave__b--${i}`} />
               ))}
             </div>
             <button
               type="button"
               className="stop-btn"
-              aria-label="Stop and review"
+              aria-label={
+                stopDisabled ? 'Waiting for transcription' : 'Stop and review'
+              }
               onClick={handleStop}
               disabled={stopDisabled}
             >
               <Square size={26} weight="fill" />
             </button>
-            <span className="voice-hint">tap to stop &amp; review</span>
+            <span className="voice-hint">
+              {stopDisabled
+                ? 'listening for that last word…'
+                : 'tap to stop & review'}
+            </span>
           </div>
         </div>
       ) : (
