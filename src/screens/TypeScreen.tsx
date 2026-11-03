@@ -1,4 +1,4 @@
-import { useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import {
   PencilSimple,
   Check,
@@ -89,6 +89,23 @@ export default function TypeScreen({ onBack, onConfirm }: Props) {
     }
   }
 
+  // Grow the textarea with its content so the field doesn't claim the
+  // whole screen when empty. CSS min-height sets the starting size and
+  // max-height caps growth before the footer gets pushed off-screen.
+  function autosize(el: HTMLTextAreaElement) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
+
+  // Re-run autosize whenever the write phase mounts (first open OR
+  // returning from review via the retry/back path) so a preserved
+  // entry doesn't flash at min-height before the next keystroke.
+  useEffect(() => {
+    if (phase === 'write' && textareaRef.current) {
+      autosize(textareaRef.current);
+    }
+  }, [phase]);
+
   function handleSubmit() {
     const trimmed = text.trim();
     if (trimmed.length < 3) return;
@@ -161,7 +178,10 @@ export default function TypeScreen({ onBack, onConfirm }: Props) {
               ref={textareaRef}
               className="type-area"
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                autosize(e.currentTarget);
+              }}
               onScroll={handleScroll}
               placeholder="start writing anything…"
               aria-label="Journal entry"
