@@ -1,0 +1,43 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Environment variables — Supabase URL + anon key live here.
+# Never commit a real .env; .env.example holds the template only.
+.env
+.env.*
+!.env.example
+
+# Capacitor iOS — Xcode artefacts that shouldn't be committed.
+# The ios/App/App project itself is fine to commit (Capacitor
+# regenerates it on `npx cap add ios`, but committing lets you
+# track Info.plist edits, app icons, etc.).
+ios/App/Pods
+ios/App/build
+ios/App/DerivedData
+ios/App/App/public
+ios/.DS_Store
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Supabase CLI local cache (linked-project metadata, version files).
+supabase/.temp/

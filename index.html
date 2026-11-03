@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/Tenor/favicon.svg" />
+    <link rel="apple-touch-icon" href="/Tenor/apple-touch-icon.png" />
+    <link rel="manifest" href="/Tenor/manifest.webmanifest" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <!-- Pure white so the iOS PWA status bar tints to match the white
+         top fade overlay — content visibly fades behind the notch. -->
+    <meta name="theme-color" content="#FFFFFF" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- `default` keeps the bottom flush with the home indicator.
+         Translucent mode looks nicer at the top but breaks the bottom
+         in our PWA — bottom correctness wins. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Merriweather:ital,wght@0,300;0,400;1,300;1,400&family=Montserrat:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <title>Tenor</title>
+    <script type="module" crossorigin src="/Tenor/assets/index-AtQYT9UP.js"></script>
+    <link rel="stylesheet" crossorigin href="/Tenor/assets/index-BUoE3_z3.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <!-- Last-resort visible error sink. Catches module-load or other
+         pre-React failures inside the iOS WebView, where Xcode's
+         console doesn't surface JS errors. If anything fires here the
+         user gets a readable message on screen instead of a blank
+         white page. Removed automatically once React mounts and
+         renders into #root. -->
+    <script>
+      (function () {
+        function paint(label, msg) {
+          try {
+            var root = document.getElementById('root');
+            if (!root) return;
+            root.innerHTML =
+              '<pre style="white-space:pre-wrap;word-break:break-word;' +
+              'padding:24px 18px;margin:0;font:13px ui-monospace,Menlo,monospace;' +
+              'color:#222;background:#fff;min-height:100vh;">' +
+              '[' + label + '] ' + String(msg) + '</pre>';
+          } catch (_) {}
+        }
+        window.addEventListener('error', function (e) {
+          paint('error', (e.error && e.error.stack) || e.message);
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          paint('promise', (e.reason && (e.reason.stack || e.reason.message)) || e.reason);
+        });
+      })();
+    </script>
+  </body>
+</html>
