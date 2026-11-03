@@ -307,6 +307,7 @@ export default function EmotionGridScreen({
   }, []);
 
   useEffect(() => {
+    if (loading) return; // clientHeight wrong while spinner is in layout
     const vp = viewportRef.current;
     if (!vp) return;
     if (userInteractedRef.current) return; // don't yank mid-explore
@@ -318,7 +319,7 @@ export default function EmotionGridScreen({
     if (!corner) return;
     vp.scrollLeft = corner.cx - vp.clientWidth / 2;
     vp.scrollTop = corner.cy - vp.clientHeight / 2;
-  }, [entryQuadrant, positions]);
+  }, [entryQuadrant, positions, loading]);
 
   // Listeners + fisheye apply: also re-attaches when positions change
   // (live vocab → new chip set) so the listener closure stays fresh.
@@ -423,7 +424,7 @@ export default function EmotionGridScreen({
         onClickCapture={onClickCapture}
         aria-label="Emotion grid"
         aria-hidden={loading ? 'true' : undefined}
-        style={loading ? { visibility: 'hidden' } : undefined}
+        style={loading ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}
       >
         <div
           className="eg-plane"

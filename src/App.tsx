@@ -6,6 +6,7 @@ import PillNav, { type NavTab } from './components/PillNav';
 import HomeScreen from './screens/HomeScreen';
 import LogMethodScreen from './screens/LogMethodScreen';
 import VoiceScreen from './screens/VoiceScreen';
+import TypeScreen from './screens/TypeScreen';
 import EmotionGridScreen from './screens/EmotionGridScreen';
 import StarburstSelectorScreen from './screens/StarburstSelectorScreen';
 import EmotionReviewScreen from './screens/EmotionReviewScreen';
@@ -54,6 +55,7 @@ type Screen =
   | 'home'
   | 'logMethod'
   | 'voice'
+  | 'type'
   | 'emotionGrid'
   | 'emotionReview'
   | 'logDetail'
@@ -465,6 +467,55 @@ export default function App() {
     finalizeNewLog(entry, parentLogId);
   }
 
+  async function submitTypeLog(chips: Detected[], text: string) {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    try {
+      const now = new Date();
+      const time = formatClock(now);
+      const quadrants = Array.from(
+        new Set(chips.map((c) => c.quadrant).filter((q): q is Quadrant => q !== null)),
+      );
+      const parentLogId = pendingParentLogId;
+      setPendingParentLogId(null);
+
+      if (auth.state.status === 'authenticated') {
+        try {
+          const result = await insertLog({
+            mode: 'type',
+            source: 'type',
+            dateKey: TODAY_KEY,
+            body: text,
+            parentLogId: parentLogId ?? null,
+            chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+          });
+          const entry = dbLogToLogEntry(result);
+          finalizeNewLog(entry, parentLogId);
+          return;
+        } catch (err) {
+          console.error('[tenor] insertLog (type) failed', err);
+        }
+      }
+
+      const entry: LogEntry = {
+        id: `t${Date.now()}`,
+        dateKey: TODAY_KEY,
+        time,
+        ts: Date.now(),
+        mode: 'type',
+        source: 'type',
+        keywords: chips.map((c) => c.text),
+        quadrants,
+        body: text,
+        chips: chips.map((c) => ({ text: c.text, quadrant: c.quadrant })),
+        parentLogId: parentLogId ?? null,
+      };
+      finalizeNewLog(entry, parentLogId);
+    } finally {
+      submittingRef.current = false;
+    }
+  }
+
   function pickQuadrant(q: Quadrant) {
     setEntryQuadrant(q);
     setEmotionSelected([]);
@@ -810,6 +861,7 @@ export default function App() {
         <LogMethodScreen
           onBack={() => setScreen('home')}
           onSpeak={() => setScreen('voice')}
+          onType={() => setScreen('type')}
           onPickQuadrant={pickQuadrant}
           onPickStarburst={pickStarburst}
           emotionUi={emotionUiVariant}
@@ -825,6 +877,18 @@ export default function App() {
             setScreen('logMethod');
           }}
           onConfirm={submitVoiceLog}
+        />
+      )}
+
+      {screen === 'type' && (
+        <TypeScreen
+          onBack={() => {
+            setLmInitialSection('methods');
+            setScreen('logMethod');
+          }}
+          onConfirm={async (chips, text) => {
+            await submitTypeLog(chips, text);
+          }}
         />
       )}
 

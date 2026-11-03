@@ -1059,6 +1059,100 @@ button {
 }
 
 /* ════════════════════════════════════════════
+   Type screen — write phase
+   ════════════════════════════════════════════ */
+
+/* The write-phase body doesn't need the same bottom padding as the
+   voice body because the confirm button lives in type-foot, not floating. */
+.type-write-body {
+  padding-bottom: 24px;
+}
+
+/* Wrapper that stacks mirror + textarea on top of each other. */
+.type-field-wrap {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* Mirror — an absolutely-positioned div that renders the same text as
+   the textarea, but with colored <mark> elements for emotion words.
+   pointer-events: none so all input falls through to the textarea. */
+.type-mirror {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.9;
+  color: transparent;           /* hide mirror text — only marks show */
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-y: auto;
+  scrollbar-width: none;
+  pointer-events: none;
+  background: var(--surface-hi);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  box-sizing: border-box;
+}
+.type-mirror::-webkit-scrollbar { display: none; }
+
+/* The textarea is stacked on top of the mirror — same geometry,
+   same font — but with transparent text so only the caret shows.
+   The <mark> elements in the mirror behind it provide the colour. */
+.type-area {
+  position: absolute;
+  inset: 0;
+  padding: 16px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 300;
+  line-height: 1.9;
+  color: transparent;
+  caret-color: var(--charcoal);
+  background: transparent;
+  border: 1.5px solid transparent;  /* match mirror border so caret lands right */
+  border-radius: 16px;
+  resize: none;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  outline: none;
+  scrollbar-width: none;
+}
+.type-area::-webkit-scrollbar { display: none; }
+.type-area::placeholder {
+  color: rgba(34, 34, 34, 0.28);
+}
+.type-area:focus-within ~ .type-mirror,
+.type-area:focus {
+  /* pull focus ring onto the mirror frame */
+}
+.type-field-wrap:focus-within .type-mirror {
+  border-color: rgba(34, 34, 34, 0.3);
+}
+
+/* Footer row — hint text left, confirm button right. */
+.type-foot {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding-top: 16px;
+  gap: 16px;
+}
+.type-hint {
+  flex: 1;
+  text-align: left;
+}
+
+/* ════════════════════════════════════════════
    Voice — review state
    ════════════════════════════════════════════ */
 .voice-body--review {

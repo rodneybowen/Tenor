@@ -11,6 +11,7 @@ import { QUADRANTS, type Quadrant } from '../theme/emotions';
 interface Props {
   onBack: () => void;
   onSpeak: () => void;
+  onType: () => void;
   /** Classic-mode handler — fires when the user picks one of the four
    *  HEP/HEN/LEP/LEN quadrants. Not invoked in starburst mode. */
   onPickQuadrant: (q: Quadrant) => void;
@@ -36,6 +37,7 @@ const QUADRANT_GRID: Quadrant[] = ['hep', 'hen', 'lep', 'len'];
 export default function LogMethodScreen({
   onBack,
   onSpeak,
+  onType,
   onPickQuadrant,
   onPickStarburst,
   emotionUi,
@@ -123,12 +125,12 @@ export default function LogMethodScreen({
               <span className="i-label">Speak</span>
             </button>
 
-            <div className="input-bubble input-bubble--off" aria-disabled="true">
+            <button type="button" className="input-bubble" onClick={onType}>
               <span className="i-bubble">
                 <PencilSimple size={28} weight="light" />
               </span>
               <span className="i-label">Type</span>
-            </div>
+            </button>
           </div>
 
           <button type="button" className="lm-help" onClick={onHelpClick}>
