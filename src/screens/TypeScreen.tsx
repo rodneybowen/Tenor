@@ -12,6 +12,7 @@ import {
   classify,
   classifyWord,
   extractEmotions,
+  findPhraseMatches,
   type Detected,
 } from '../lib/emotionDetect';
 import { quadrantColor, shadeQuadrant } from '../theme/emotions';
@@ -47,19 +48,21 @@ function chipStyle(q: Detected['quadrant']): CSSProperties {
   };
 }
 
-/** Tokenise `text` and return an array of React nodes — whitespace
- *  tokens pass through; word tokens that match the lexicon get a
- *  <mark> with a quadrant-colored inline style. */
-function renderHighlighted(text: string): React.ReactNode[] {
+/** Per-word tokenizer for a non-phrase chunk of text. Whitespace tokens
+ *  pass through; alphabetic tokens that classify as an emotion get
+ *  wrapped in <mark>. `keyBase` scopes the keys so sibling chunks
+ *  don't collide. */
+function renderWordLevel(text: string, keyBase: string): React.ReactNode[] {
   const tokens = text.split(/(\s+)/);
   return tokens.map((tok, i) => {
-    if (/^\s+$/.test(tok)) return <span key={i}>{tok}</span>;
+    const k = `${keyBase}:${i}`;
+    if (/^\s+$/.test(tok)) return <span key={k}>{tok}</span>;
     const m = tok.match(/^([^A-Za-z]*)([A-Za-z][A-Za-z'-]*)([^A-Za-z]*)$/);
     if (m) {
       const q = classifyWord(m[2]);
       if (q) {
         return (
-          <span key={i}>
+          <span key={k}>
             {m[1]}
             <mark style={kwStyle(q)}>{m[2]}</mark>
             {m[3]}
@@ -67,8 +70,36 @@ function renderHighlighted(text: string): React.ReactNode[] {
         );
       }
     }
-    return <span key={i}>{tok}</span>;
+    return <span key={k}>{tok}</span>;
   });
+}
+
+/** Build the highlighted node tree. Phrase matches (multi-word idioms
+ *  from the sheet + extras) are marked as single units; the gaps
+ *  between them get the per-word tokenizer. */
+function renderHighlighted(text: string): React.ReactNode[] {
+  const phraseSpans = findPhraseMatches(text);
+  const parts: React.ReactNode[] = [];
+  let pos = 0;
+  phraseSpans.forEach((span, i) => {
+    if (span.start > pos) {
+      parts.push(
+        <span key={`g${i}`}>{renderWordLevel(text.slice(pos, span.start), `g${i}`)}</span>,
+      );
+    }
+    parts.push(
+      <mark key={`p${i}`} style={kwStyle(span.quadrant)}>
+        {text.slice(span.start, span.end)}
+      </mark>,
+    );
+    pos = span.end;
+  });
+  if (pos < text.length) {
+    parts.push(
+      <span key="tail">{renderWordLevel(text.slice(pos), 'tail')}</span>,
+    );
+  }
+  return parts;
 }
 
 export default function TypeScreen({ onBack, onConfirm }: Props) {

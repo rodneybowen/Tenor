@@ -1,8 +1,11 @@
 // Client-side affect detection. No backend: we match the transcript against
-// an emotion lexicon (explicit feeling words + colloquial tone words) and a
-// short list of affect phrases, mapping each to a quadrant for color.
+// an emotion lexicon (every keyword from the shared Google Sheet, plus a
+// short list of everyday colloquialisms that aren't in the clinical sheet)
+// and a list of multi-word affect phrases, mapping each to a quadrant for
+// color.
 
-import { EMOTIONS, type Quadrant } from '../theme/emotions';
+import type { Quadrant } from '../theme/emotions';
+import { SHEET_PHRASES, SHEET_WORDS } from '../data/sheetVocabulary';
 
 export interface Detected {
   /** surface text shown on the chip / highlighted in the transcript */
@@ -11,58 +14,82 @@ export interface Detected {
   quadrant: Quadrant | null;
 }
 
-// Build the base lexicon from the canonical emotion vocabulary, then add
-// everyday words people actually say out loud.
-const LEXICON: Record<string, Quadrant> = {};
+// Primary lexicon: every single-token keyword the user's canonical sheet
+// defines. Lowercase keys.
+const LEXICON: Record<string, Quadrant> = { ...SHEET_WORDS };
 
-for (const q of Object.keys(EMOTIONS) as Quadrant[]) {
-  for (const word of EMOTIONS[q]) {
-    LEXICON[word.toLowerCase()] = q;
-  }
-}
-
+// Everyday colloquial words that are missing from the clinical sheet but
+// people actually say / type. Kept small — the sheet is the source of
+// truth. Each line notes the sheet word it stands in for.
 const EXTRA: Record<string, Quadrant> = {
-  // HEP — high energy positive
-  great: 'hep', amazing: 'hep', awesome: 'hep', fantastic: 'hep', thrilled: 'hep',
-  pumped: 'hep', stoked: 'hep', motivated: 'hep', energized: 'hep', alive: 'hep',
-  buzzing: 'hep', radiant: 'hep', delighted: 'hep', overjoyed: 'hep',
-  // LEP — low energy positive
-  okay: 'lep', fine: 'lep', alright: 'lep', chill: 'lep', settled: 'lep',
-  rested: 'lep', steady: 'lep', soothed: 'lep', mellow: 'lep', cozy: 'lep',
-  safe: 'lep', balanced: 'lep', easy: 'lep', light: 'lep',
-  // HEN — high energy negative
-  mad: 'hen', pissed: 'hen', annoyed: 'hen', restless: 'hen', wired: 'hen',
-  jittery: 'hen', panicky: 'hen', dread: 'hen', rattled: 'hen', snappy: 'hen',
-  fuming: 'hen', livid: 'hen', worried: 'hen', scared: 'hen', afraid: 'hen',
-  // LEN — low energy negative
-  sad: 'len', blue: 'len', down: 'len', low: 'len', drained: 'len',
-  flat: 'len', heavy: 'len', tired: 'len', weary: 'len', hollow: 'len',
-  unmotivated: 'len', withdrawn: 'len', stuck: 'len', meh: 'len', blah: 'len',
+  // HEP — colloquial gaps around joy/excitement
+  happy: 'hep',       // sheet has cheerful/content/chipper, not plain "happy"
+  great: 'hep',
+  amazing: 'hep',
+  awesome: 'hep',
+  fantastic: 'hep',
+  pumped: 'hep',      // sheet has hyped/amped
+  stoked: 'hep',      // sheet has thrilled/stoked but as "/" alt
+  motivated: 'hep',
+  alive: 'hep',
+  // LEP — colloquial gaps around calm/ease
+  fine: 'lep',
+  alright: 'lep',
+  soothed: 'lep',
+  easy: 'lep',
+  light: 'lep',
+  // HEN — colloquial gaps around anger/fear
+  scared: 'hen',      // sheet has spooked/terrified/threatened
+  afraid: 'hen',
+  worried: 'hen',     // sheet has apprehensive/anxious
+  dread: 'hen',
+  rattled: 'hen',
+  snappy: 'hen',
+  fuming: 'hen',
+  wired: 'hen',
+  // LEN — colloquial gaps around sadness/exhaustion
+  blue: 'len',        // slang for sad
+  down: 'len',        // sheet has "Down / Bummed out" but ensure it's keyed
+  flat: 'len',
+  stuck: 'len',
+  meh: 'len',
+  withdrawn: 'len',
+  hollow: 'len',      // sheet has it under LEN strong already — safe no-op
+  weary: 'len',       // sheet has it under LEN moderate — safe no-op
 };
 
-for (const [w, q] of Object.entries(EXTRA)) LEXICON[w] = q;
+for (const [w, q] of Object.entries(EXTRA)) {
+  if (!(w in LEXICON)) LEXICON[w] = q;
+}
 
-// Multi-word tone phrases — these carry the feeling of a sentence even when
-// no single word does ("yesterday was so draining" still hits "draining",
-// but "burned out" / "on edge" only read as phrases).
-const PHRASES: { phrase: string; quadrant: Quadrant }[] = [
-  { phrase: 'burned out', quadrant: 'len' },
-  { phrase: 'burnt out', quadrant: 'len' },
-  { phrase: 'worn out', quadrant: 'len' },
-  { phrase: 'wiped out', quadrant: 'len' },
-  { phrase: 'let down', quadrant: 'len' },
-  { phrase: 'shut down', quadrant: 'len' },
-  { phrase: 'on edge', quadrant: 'hen' },
+// Multi-word tone phrases. Sheet-sourced phrases first (built from the
+// Google Sheet), then a handful of common idioms the sheet doesn't list.
+const SHEET_PHRASE_ENTRIES: { phrase: string; quadrant: Quadrant }[] =
+  Object.entries(SHEET_PHRASES).map(([phrase, quadrant]) => ({ phrase, quadrant }));
+
+const EXTRA_PHRASES: { phrase: string; quadrant: Quadrant }[] = [
+  { phrase: 'burned out', quadrant: 'len' },     // US spelling; sheet has "burnt out"
+  { phrase: 'worn out',   quadrant: 'len' },
+  { phrase: 'wiped out',  quadrant: 'len' },
+  { phrase: 'let down',   quadrant: 'len' },
+  { phrase: 'shut down',  quadrant: 'len' },
+  { phrase: 'on edge',    quadrant: 'hen' },
   { phrase: 'freaking out', quadrant: 'hen' },
-  { phrase: 'fed up', quadrant: 'hen' },
+  { phrase: 'fed up',     quadrant: 'hen' },
   { phrase: 'stressed out', quadrant: 'hen' },
-  { phrase: 'at peace', quadrant: 'lep' },
-  { phrase: 'at ease', quadrant: 'lep' },
-  { phrase: 'let go', quadrant: 'lep' },
+  { phrase: 'at peace',   quadrant: 'lep' },
+  { phrase: 'let go',     quadrant: 'lep' },
   { phrase: 'over the moon', quadrant: 'hep' },
   { phrase: 'on top of the world', quadrant: 'hep' },
   { phrase: 'looking forward', quadrant: 'hep' },
 ];
+
+// Longer phrases first so a match on "sick to my stomach" wins before any
+// short phrase inside it would.
+const PHRASES: { phrase: string; quadrant: Quadrant }[] = [
+  ...SHEET_PHRASE_ENTRIES,
+  ...EXTRA_PHRASES,
+].sort((a, b) => b.phrase.length - a.phrase.length);
 
 function normalize(token: string): string {
   return token.toLowerCase().replace(/[^a-z]/g, '');
@@ -139,4 +166,34 @@ export function classifyWord(rawToken: string): Quadrant | null {
   const norm = normalize(rawToken);
   if (norm.length < 3) return null;
   return lookup(norm);
+}
+
+/** Phrase spans in `text` so a live renderer can mark multi-word idioms
+ *  ("burnt out", "on cloud nine") as one unit instead of letting the
+ *  word-level tokenizer miss them. Longest phrases match first;
+ *  overlapping shorter matches are skipped. Only word-boundary matches
+ *  count — "at ease" won't match inside "wheat easel". */
+export function findPhraseMatches(
+  text: string,
+): Array<{ start: number; end: number; quadrant: Quadrant }> {
+  const lower = text.toLowerCase();
+  const matches: Array<{ start: number; end: number; quadrant: Quadrant }> = [];
+  const used = new Array<boolean>(text.length).fill(false);
+  for (const { phrase, quadrant } of PHRASES) {
+    let idx = 0;
+    while ((idx = lower.indexOf(phrase, idx)) !== -1) {
+      const end = idx + phrase.length;
+      let overlaps = false;
+      for (let i = idx; i < end; i++) if (used[i]) { overlaps = true; break; }
+      const beforeOk = idx === 0 || !/[A-Za-z]/.test(text[idx - 1]);
+      const afterOk = end >= text.length || !/[A-Za-z]/.test(text[end]);
+      if (!overlaps && beforeOk && afterOk) {
+        matches.push({ start: idx, end, quadrant });
+        for (let i = idx; i < end; i++) used[i] = true;
+      }
+      idx = end;
+    }
+  }
+  matches.sort((a, b) => a.start - b.start);
+  return matches;
 }
